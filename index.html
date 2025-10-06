@@ -260,6 +260,18 @@
                 );
             },
             
+            // Listen to projects in real-time
+            listenToProjects(userId, callback) {
+                this.projectsUnsubscribe = onSnapshot(
+                    collection(db, `users/${userId}/projects`),
+                    (snapshot) => {
+                        const projects = [];
+                        snapshot.forEach(doc => projects.push(doc.data()));
+                        callback(projects);
+                    }
+                );
+            },
+            
             // Save project
             async saveProject(userId, project) {
                 await setDoc(doc(db, `users/${userId}/projects/${project.id}`), project);
@@ -4066,7 +4078,9 @@ class TaskFlowEnhanced {
         
         try {
             // Check if this is first login - migrate localStorage data
+            console.log('📦 Checking for existing tasks...');
             const existingTasks = await window.FirebaseManager.getTasks(userId);
+            console.log('✅ Existing tasks:', existingTasks.length);
             
             if (existingTasks.length === 0 && this.tasks.length > 0) {
                 console.log('📦 Migrating localStorage data to Firestore...');
@@ -4074,10 +4088,16 @@ class TaskFlowEnhanced {
             }
             
             // Load data from Firestore
+            console.log('📥 Loading tasks from Firestore...');
             this.tasks = await window.FirebaseManager.getTasks(userId);
+            console.log('✅ Loaded tasks:', this.tasks.length);
+            
+            console.log('📥 Loading projects from Firestore...');
             this.projects = await window.FirebaseManager.getProjects(userId);
+            console.log('✅ Loaded projects:', this.projects.length);
             
             // Set up real-time listeners
+            console.log('📡 Setting up real-time listeners...');
             window.FirebaseManager.listenToTasks(userId, (tasks) => {
                 console.log('📡 Real-time task update received');
                 this.tasks = tasks;
@@ -4089,14 +4109,21 @@ class TaskFlowEnhanced {
                 this.projects = projects;
                 this.renderProjectFilters();
             });
+            console.log('✅ Real-time listeners set up');
             
             // Initial render
+            console.log('🎨 Rendering initial view...');
             this.render();
             
             console.log('✅ Firebase initialization complete');
         } catch (error) {
             console.error('❌ Firebase initialization error:', error);
-            alert('Error loading your data. Please try refreshing the page.');
+            console.error('Error details:', {
+                message: error.message,
+                code: error.code,
+                stack: error.stack
+            });
+            alert('Error loading your data: ' + error.message + '\n\nPlease check the console (F12) for details.');
         }
     }
 
