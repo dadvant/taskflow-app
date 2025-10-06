@@ -1,0 +1,13 @@
+{
+  "name": "TaskFlow Enhanced",
+  "short_name": "TaskFlow", 
+  "description": "AI-powered task management with calendar integration",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#4285f4",
+  "theme_color": "#4285f4",
+  "orientation": "portrait-primary",
+  "categories": ["productivity", "utilities"],
+  "lang": "en",
+  "scope": "."
+}
