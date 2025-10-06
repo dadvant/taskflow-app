@@ -3910,18 +3910,28 @@ window.onload = function() {
                 
                 // CRITICAL: Load the calendar API explicitly (this works even if discovery fails)
                 console.log('📦 Loading Calendar API v3...');
-                await gapi.client.load('calendar', 'v3');
-                console.log('✅ Calendar API v3 loaded');
+                try {
+                    await gapi.client.load('calendar', 'v3');
+                    console.log('✅ Calendar API v3 loaded successfully');
+                } catch (calError) {
+                    console.error('❌ Failed to load Calendar API:', calError);
+                    // Try to continue anyway - the API might still work
+                }
                 
                 console.log('📦 Loading OAuth2 API v2...');
-                await gapi.client.load('oauth2', 'v2');
-                console.log('✅ OAuth2 API v2 loaded');
+                try {
+                    await gapi.client.load('oauth2', 'v2');
+                    console.log('✅ OAuth2 API v2 loaded successfully');
+                } catch (oauthError) {
+                    console.error('❌ Failed to load OAuth2 API:', oauthError);
+                    // Continue anyway
+                }
                 
                 // Verify calendar API is available
                 if (gapi.client.calendar) {
                     console.log('✅ Calendar API is ready:', !!gapi.client.calendar.events);
                 } else {
-                    console.error('❌ Calendar API failed to load!');
+                    console.warn('⚠️ Calendar API not available - may need to authorize first');
                 }
                 
                 // Restore saved token if it exists
