@@ -110,7 +110,24 @@
             async signInWithGoogle() {
                 try {
                     const provider = new GoogleAuthProvider();
+                    // Request Calendar permissions at login time
+                    provider.addScope('https://www.googleapis.com/auth/calendar');
+                    provider.addScope('https://www.googleapis.com/auth/calendar.events');
+                    
                     const result = await signInWithPopup(auth, provider);
+                    
+                    // Store the OAuth credential for Calendar API access
+                    const credential = GoogleAuthProvider.credentialFromResult(result);
+                    if (credential && credential.accessToken) {
+                        // Save the access token for Calendar API
+                        const token = {
+                            access_token: credential.accessToken,
+                            expires_at: Date.now() + (60 * 60 * 1000) // 1 hour from now
+                        };
+                        localStorage.setItem('google_access_token', JSON.stringify(token));
+                        console.log('✅ Google Calendar access token saved');
+                    }
+                    
                     return result.user;
                 } catch (error) {
                     console.error('Google sign-in error:', error);
@@ -165,6 +182,18 @@
                 if (userEmail) userEmail.textContent = user.email || 'User';
                 if (userEmailFull) userEmailFull.textContent = user.email || 'User';
                 if (userAvatar) userAvatar.textContent = (user.email?.[0] || 'U').toUpperCase();
+                
+                // Check if user signed in with Google and has Calendar access token
+                const hasCalendarToken = localStorage.getItem('google_access_token');
+                if (hasCalendarToken && user.providerData?.[0]?.providerId === 'google.com') {
+                    console.log('✅ User logged in with Google - Calendar access available');
+                    // Auto-setup Google Calendar connection
+                    setTimeout(() => {
+                        if (window.app) {
+                            window.app.autoSetupGoogleCalendar(user.email);
+                        }
+                    }, 1000);
+                }
                 
                 // Migrate localStorage to Firestore
                 this.migrateToFirestore(user.uid);
@@ -1345,7 +1374,8 @@
             <div class="modal-body">
                 <!-- EXACT COPY FROM WORKING googlecalendar/index.html -->
                 <div id="authorize-div" style="display: none; text-align: center; padding: 20px;">
-                    <p>Click the button below to authorize Google Calendar access:</p>
+                    <p><strong>💡 Tip:</strong> If you sign in with Google at login, Calendar access is automatic!</p>
+                    <p>Click below only if you need to re-authorize:</p>
                     <button id="authorize-button" class="btn btn--primary btn--large" onclick="handleAuthClick()">
                         <i class="fab fa-google"></i> Authorize Google Calendar
                     </button>
@@ -2486,17 +2516,35 @@ let gisInited = false;
 function handleAuthClick() {
     console.log('🔥 Auth button clicked!');
     
+    // Disable button and show loading
+    const authButton = document.getElementById('authorize-button');
+    if (authButton) {
+        authButton.disabled = true;
+        authButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Opening Google Sign-In...';
+    }
+    
     if (!tokenClient) {
         console.error('❌ TokenClient not initialized');
         alert('Google authentication not ready. Please refresh the page.');
+        if (authButton) {
+            authButton.disabled = false;
+            authButton.innerHTML = '<i class="fab fa-google"></i> Authorize Google Calendar';
+        }
         return;
     }
     
     // Set callback for this specific request
     tokenClient.callback = async (resp) => {
+        const authButton = document.getElementById('authorize-button');
+        
         if (resp.error !== undefined) {
             console.error('❌ Auth error:', resp.error);
             alert('Authentication failed: ' + resp.error);
+            // Re-enable button
+            if (authButton) {
+                authButton.disabled = false;
+                authButton.innerHTML = '<i class="fab fa-google"></i> Authorize Google Calendar';
+            }
             return;
         }
         
@@ -2569,6 +2617,12 @@ function handleAuthClick() {
                 }
             }
             
+            // Clear timeout if auth succeeded
+            if (tokenClient && tokenClient.timeoutId) {
+                clearTimeout(tokenClient.timeoutId);
+                tokenClient.timeoutId = null;
+            }
+            
             // Update UI
             document.getElementById('authorize-div').style.display = 'none';
             document.getElementById('signout-div').style.display = 'block';
@@ -2577,7 +2631,7 @@ function handleAuthClick() {
             const modal = document.getElementById('googleAuthModal');
             if (modal) {
                 modal.style.display = 'none';
-                console.log('� Modal closed');
+                console.log('✅ Modal closed');
             }
             
             // Update TaskFlow state
@@ -2601,11 +2655,30 @@ function handleAuthClick() {
         } catch (error) {
             console.error('❌ Error in auth callback:', error);
             alert('Setup failed: ' + error.message);
+            // Re-enable button
+            const authButton = document.getElementById('authorize-button');
+            if (authButton) {
+                authButton.disabled = false;
+                authButton.innerHTML = '<i class="fab fa-google"></i> Authorize Google Calendar';
+            }
         }
     };
     
     // Request access token with proper popup handling
     try {
+        // Set a timeout to re-enable button if user closes popup
+        const timeoutId = setTimeout(() => {
+            const authButton = document.getElementById('authorize-button');
+            if (authButton && authButton.disabled) {
+                authButton.disabled = false;
+                authButton.innerHTML = '<i class="fab fa-google"></i> Authorize Google Calendar';
+                console.log('⏱️ Auth timeout - re-enabled button');
+            }
+        }, 60000); // 60 seconds timeout
+        
+        // Store timeout ID to clear it if auth succeeds
+        tokenClient.timeoutId = timeoutId;
+        
         if (gapi.client.getToken() === null) {
             // First time auth - request consent and force account selection
             tokenClient.requestAccessToken({
@@ -2622,6 +2695,12 @@ function handleAuthClick() {
     } catch (error) {
         console.error('❌ Request failed:', error);
         alert('Authentication request failed: ' + error.message);
+        // Re-enable button
+        const authButton = document.getElementById('authorize-button');
+        if (authButton) {
+            authButton.disabled = false;
+            authButton.innerHTML = '<i class="fab fa-google"></i> Authorize Google Calendar';
+        }
     }
 }
 
@@ -5114,6 +5193,39 @@ Calendar event will be created separately.`);
             }
         } else {
             console.log('❌ Connect Google Calendar button not found!');
+        }
+    }
+
+    autoSetupGoogleCalendar(userEmail) {
+        console.log('🔄 Auto-setting up Google Calendar for:', userEmail);
+        
+        try {
+            // Save email to localStorage
+            localStorage.setItem('google_account_email', userEmail);
+            
+            // Add to calendar accounts if not already there
+            const existingGoogleAccount = this.calendarAccounts.find(acc => acc.provider === 'google');
+            if (!existingGoogleAccount) {
+                const newAccount = {
+                    provider: 'google',
+                    accountName: 'Primary Account',
+                    email: userEmail,
+                    calendars: ['Primary Calendar'],
+                    status: 'connected',
+                    connectedAt: new Date().toISOString()
+                };
+                this.calendarAccounts.push(newAccount);
+                localStorage.setItem('taskflow_calendar_accounts', JSON.stringify(this.calendarAccounts));
+                console.log('✅ Google Calendar auto-connected');
+            }
+            
+            // Update UI
+            this.updateGoogleCalendarConnectedState(true);
+            this.forceUpdateConnectedAccountsTable();
+            this.showNotification('Google Calendar connected automatically!', 'success');
+            
+        } catch (error) {
+            console.error('❌ Auto-setup failed:', error);
         }
     }
 
