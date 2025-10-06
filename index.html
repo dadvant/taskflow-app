@@ -3902,14 +3902,13 @@ window.onload = function() {
             try {
                 console.log('📦 Initializing Google API client...');
                 
-                // Initialize the client
+                // Initialize the client WITHOUT discovery docs (to avoid 403 error)
                 await gapi.client.init({
                     apiKey: API_KEY,
-                    discoveryDocs: [DISCOVERY_DOC, OAUTH2_DISCOVERY_DOC],
                 });
                 console.log('✅ GAPI client initialized');
                 
-                // CRITICAL: Load the calendar API explicitly
+                // CRITICAL: Load the calendar API explicitly (this works even if discovery fails)
                 console.log('📦 Loading Calendar API v3...');
                 await gapi.client.load('calendar', 'v3');
                 console.log('✅ Calendar API v3 loaded');
