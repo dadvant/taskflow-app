@@ -110,24 +110,7 @@
             async signInWithGoogle() {
                 try {
                     const provider = new GoogleAuthProvider();
-                    // Request Calendar permissions at login time
-                    provider.addScope('https://www.googleapis.com/auth/calendar');
-                    provider.addScope('https://www.googleapis.com/auth/calendar.events');
-                    
                     const result = await signInWithPopup(auth, provider);
-                    
-                    // Store the OAuth credential for Calendar API access
-                    const credential = GoogleAuthProvider.credentialFromResult(result);
-                    if (credential && credential.accessToken) {
-                        // Save the access token for Calendar API
-                        const token = {
-                            access_token: credential.accessToken,
-                            expires_at: Date.now() + (60 * 60 * 1000) // 1 hour from now
-                        };
-                        localStorage.setItem('google_access_token', JSON.stringify(token));
-                        console.log('✅ Google Calendar access token saved');
-                    }
-                    
                     return result.user;
                 } catch (error) {
                     console.error('Google sign-in error:', error);
@@ -182,18 +165,6 @@
                 if (userEmail) userEmail.textContent = user.email || 'User';
                 if (userEmailFull) userEmailFull.textContent = user.email || 'User';
                 if (userAvatar) userAvatar.textContent = (user.email?.[0] || 'U').toUpperCase();
-                
-                // Check if user signed in with Google and has Calendar access token
-                const hasCalendarToken = localStorage.getItem('google_access_token');
-                if (hasCalendarToken && user.providerData?.[0]?.providerId === 'google.com') {
-                    console.log('✅ User logged in with Google - Calendar access available');
-                    // Auto-setup Google Calendar connection
-                    setTimeout(() => {
-                        if (window.app) {
-                            window.app.autoSetupGoogleCalendar(user.email);
-                        }
-                    }, 1000);
-                }
                 
                 // Migrate localStorage to Firestore
                 this.migrateToFirestore(user.uid);
@@ -1374,11 +1345,14 @@
             <div class="modal-body">
                 <!-- EXACT COPY FROM WORKING googlecalendar/index.html -->
                 <div id="authorize-div" style="display: none; text-align: center; padding: 20px;">
-                    <p><strong>💡 Tip:</strong> If you sign in with Google at login, Calendar access is automatic!</p>
-                    <p>Click below only if you need to re-authorize:</p>
+                    <p><strong>✅ You're signed in with Google!</strong></p>
+                    <p>Just one more click to add Calendar permissions to your existing Google account:</p>
                     <button id="authorize-button" class="btn btn--primary btn--large" onclick="handleAuthClick()">
-                        <i class="fab fa-google"></i> Authorize Google Calendar
+                        <i class="fab fa-google"></i> Add Calendar Access
                     </button>
+                    <p style="margin-top: 12px; font-size: 13px; color: #666;">
+                        This will use your existing Google account - no need to sign in again!
+                    </p>
                 </div>
                 
                 <div id="signout-div" style="display: none; text-align: center; padding: 20px;">
