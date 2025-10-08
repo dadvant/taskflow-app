@@ -3101,6 +3101,13 @@ async function createGoogleCalendarEventSimple(task) {
         
         console.log('📝 Event object:', event);
         
+        // Ensure Calendar API is loaded
+        if (!gapi.client.calendar) {
+            console.log('📦 Calendar API not loaded, loading now...');
+            await gapi.client.load('calendar', 'v3');
+            console.log('✅ Calendar API loaded');
+        }
+        
         const request = await gapi.client.calendar.events.insert({
             'calendarId': 'primary',
             'resource': event
@@ -3216,6 +3223,13 @@ async function updateGoogleCalendarEvent(task) {
         };
         
         console.log('📝 Updated event object:', event);
+        
+        // Ensure Calendar API is loaded
+        if (!gapi.client.calendar) {
+            console.log('📦 Calendar API not loaded, loading now...');
+            await gapi.client.load('calendar', 'v3');
+            console.log('✅ Calendar API loaded');
+        }
         
         // Update the event using Google Calendar API
         const request = await gapi.client.calendar.events.update({
@@ -3936,15 +3950,23 @@ window.onload = function() {
                 
                 // Restore saved token if it exists
                 const savedToken = localStorage.getItem('google_access_token');
+                console.log('🔍 Checking for saved token...', savedToken ? 'Found' : 'Not found');
                 if (savedToken) {
                     try {
                         const token = JSON.parse(savedToken);
+                        console.log('📝 Parsed token:', token);
                         gapi.client.setToken(token);
                         console.log('🔄 Restored Google access token from localStorage');
+                        
+                        // Verify token was set
+                        const verifyToken = gapi.client.getToken();
+                        console.log('✅ Token verification:', verifyToken ? 'Token is set' : 'Token NOT set');
                     } catch (error) {
-                        console.error('Failed to restore token:', error);
+                        console.error('❌ Failed to restore token:', error);
                         localStorage.removeItem('google_access_token');
                     }
+                } else {
+                    console.log('ℹ️ No saved token found - user needs to authorize Calendar');
                 }
                 
                 gapiInited = true;
