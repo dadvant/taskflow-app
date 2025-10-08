@@ -6585,9 +6585,9 @@ Calendar event will be created separately.`);
         };
 
         // ENHANCED DATE PARSING
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Reset to midnight for accurate date calculations
-        console.log('🤖 Date parsing - Today:', today.toISOString().split('T')[0], 'Text:', lowercaseText);
+        const now = new Date();
+        const today = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()); // Use UTC date for consistency
+        console.log('🤖 Date parsing - Today (UTC):', today.toISOString().split('T')[0], 'Text:', lowercaseText);
         
         // Pattern 1: "in X days" or "X days from now" (supports both digits and words)
         const inDaysPattern = /(?:in\s+)?(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|a|\d+)\s+days?(?:\s+from\s+now)?/i;
