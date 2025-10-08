@@ -6566,6 +6566,7 @@ Calendar event will be created separately.`);
         const result = {
             suggestedDate: '',
             suggestedTime: '',
+            suggestedTitle: text, // Start with original text
             hasCalendarKeywords: false,
             confidence: 0
         };
@@ -6599,6 +6600,7 @@ Calendar event will be created separately.`);
             targetDate.setDate(today.getDate() + daysToAdd);
             result.suggestedDate = targetDate.toISOString().split('T')[0];
             result.confidence += 35;
+            result.suggestedTitle = result.suggestedTitle.replace(inDaysMatch[0], '').trim();
             console.log(`🤖 Parsed "${daysInput} days":`, result.suggestedDate);
         }
         // Pattern 2: "tomorrow" - MUST check BEFORE other patterns
@@ -6607,12 +6609,14 @@ Calendar event will be created separately.`);
             tomorrow.setDate(today.getDate() + 1);
             result.suggestedDate = tomorrow.toISOString().split('T')[0];
             result.confidence += 30;
+            result.suggestedTitle = result.suggestedTitle.replace(/tomorrow/gi, '').trim();
             console.log('🤖 Parsed "tomorrow":', result.suggestedDate, 'from today:', today.toISOString().split('T')[0]);
         }
         // Pattern 3: "today"
         else if (lowercaseText.includes('today')) {
             result.suggestedDate = today.toISOString().split('T')[0];
             result.confidence += 30;
+            result.suggestedTitle = result.suggestedTitle.replace(/today/gi, '').trim();
             console.log('🤖 Parsed "today":', result.suggestedDate);
         }
         // Pattern 4: "next week" or "next week same day"
@@ -6621,6 +6625,7 @@ Calendar event will be created separately.`);
             nextWeek.setDate(today.getDate() + 7);
             result.suggestedDate = nextWeek.toISOString().split('T')[0];
             result.confidence += 30;
+            result.suggestedTitle = result.suggestedTitle.replace(/next\s+week/gi, '').trim();
             console.log('🤖 Parsed "next week":', result.suggestedDate);
         }
         // Pattern 5: "in a week" or "in 1 week"
@@ -6629,6 +6634,7 @@ Calendar event will be created separately.`);
             nextWeek.setDate(today.getDate() + 7);
             result.suggestedDate = nextWeek.toISOString().split('T')[0];
             result.confidence += 30;
+            result.suggestedTitle = result.suggestedTitle.replace(/in\s+(?:a|1)\s+week/gi, '').trim();
         }
         // Pattern 6: "in X weeks" (supports both digits and words)
         else if (lowercaseText.match(/in\s+(one|two|three|four|a|\d+)\s+weeks?/i)) {
@@ -6639,6 +6645,7 @@ Calendar event will be created separately.`);
             targetDate.setDate(today.getDate() + (weeksToAdd * 7));
             result.suggestedDate = targetDate.toISOString().split('T')[0];
             result.confidence += 30;
+            result.suggestedTitle = result.suggestedTitle.replace(weeksMatch[0], '').trim();
             console.log(`🤖 Parsed "${weeksInput} weeks":`, result.suggestedDate);
         }
         // Pattern 7: Specific day names (next monday, tuesday, etc.)
@@ -6661,6 +6668,7 @@ Calendar event will be created separately.`);
                 targetDate.setDate(today.getDate() + daysUntil);
                 result.suggestedDate = targetDate.toISOString().split('T')[0];
                 result.confidence += 35;
+                result.suggestedTitle = result.suggestedTitle.replace(nextDayMatch[0], '').trim();
                 console.log(`🤖 Parsed "next ${targetDayName}":`, result.suggestedDate);
             }
         }
@@ -6697,6 +6705,7 @@ Calendar event will be created separately.`);
 
                 result.suggestedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
                 result.confidence += 40;
+                result.suggestedTitle = result.suggestedTitle.replace(match[0], '').trim();
                 console.log('🤖 ✅ Final suggested time:', result.suggestedTime);
                 break;
             }
@@ -6718,6 +6727,12 @@ Calendar event will be created separately.`);
         console.log('🤖 Parsing title:', titleEl.value);
         const parsed = this.parseNaturalLanguage(titleEl.value);
         console.log('🤖 AI Parsing result:', parsed);
+
+        // Auto-fill title if cleaned (remove date/time words)
+        if (parsed.suggestedTitle && parsed.suggestedTitle !== titleEl.value.trim()) {
+            titleEl.value = parsed.suggestedTitle;
+            console.log('🤖 ✅ Cleaned title:', parsed.suggestedTitle);
+        }
 
         // Auto-fill date if detected (allow updating for edits)
         if (parsed.suggestedDate) {
