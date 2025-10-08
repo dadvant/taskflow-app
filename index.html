@@ -190,41 +190,26 @@
             // Migrate localStorage to Firestore (one-time)
             async migrateToFirestore(userId) {
                 try {
+                    // Check if user already has data in Firestore
                     const migrationDoc = await getDoc(doc(db, `users/${userId}/settings/migration`));
                     if (migrationDoc.exists() && migrationDoc.data().completed) {
-                        console.log('✅ Migration already completed');
+                        console.log('✅ Migration already completed for this user');
                         return;
                     }
 
-                    console.log('🔄 Migrating localStorage to Firestore...');
-
-                    // Migrate tasks
-                    const localTasks = localStorage.getItem('taskflow_tasks');
-                    if (localTasks) {
-                        const tasks = JSON.parse(localTasks);
-                        for (const task of tasks) {
-                            await setDoc(doc(db, `users/${userId}/tasks/${task.id}`), task);
-                        }
-                        console.log(`✅ Migrated ${tasks.length} tasks`);
-                    }
-
-                    // Migrate projects
-                    const localProjects = localStorage.getItem('taskflow_projects');
-                    if (localProjects) {
-                        const projects = JSON.parse(localProjects);
-                        for (const project of projects) {
-                            await setDoc(doc(db, `users/${userId}/projects/${project.id}`), project);
-                        }
-                        console.log(`✅ Migrated ${projects.length} projects`);
-                    }
-
-                    // Mark migration complete
+                    console.log('🆕 New user detected - starting with empty task list');
+                    
+                    // DO NOT migrate localStorage - each user starts fresh!
+                    // localStorage might contain data from another user's browser session
+                    
+                    // Just mark migration as complete so new users start clean
                     await setDoc(doc(db, `users/${userId}/settings/migration`), {
                         completed: true,
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
+                        startedClean: true  // Flag to indicate this user started with no migrated data
                     });
 
-                    console.log('✅ Migration completed!');
+                    console.log('✅ User initialized with empty task list');
                 } catch (error) {
                     console.error('❌ Migration error:', error);
                 }
