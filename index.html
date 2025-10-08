@@ -3116,9 +3116,13 @@ async function createGoogleCalendarEventSimple(task) {
         console.log('🕒 Event times:', { startDateTime, endDateTime });
 
         // Direct Google Calendar API call (same as working test)
+        // Ensure event description contains a stable TaskFlow identifier so we can
+        // reliably find and delete events later even if the stored event ID is missing.
+        const taskflowMarker = `\n\nTaskFlowID:${task.id}`;
+        const baseDescription = task.description || 'Created by TaskFlow AI';
         const event = {
             'summary': task.title,
-            'description': task.description || 'Created by TaskFlow AI',
+            'description': baseDescription + taskflowMarker,
             'start': {
                 'dateTime': startDateTime,
                 'timeZone': Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -3132,7 +3136,7 @@ async function createGoogleCalendarEventSimple(task) {
         console.log('📝 Event object:', event);
         
         // Use direct REST API call (no need to load Calendar API)
-        const result = await calendarAPICall('POST', '/calendars/primary/events', event);
+    const result = await calendarAPICall('POST', '/calendars/primary/events', event);
         console.log('✅ Event created successfully:', result.htmlLink);
         return result;
         
@@ -3701,8 +3705,52 @@ async function deleteGoogleCalendarEventByTask(task, calendarId = 'primary') {
                 return false;
             }
         } else {
-            console.warn('⚠️ Task has no calendarEventId, cannot delete associated calendar event');
-            return false;
+            console.warn('⚠️ Task has no calendarEventId, attempting safe fallback search by TaskFlowID');
+
+            // Safe fallback: search for events that include a TaskFlowID marker in the description
+            // Limit search window to the task's due date to avoid broad deletions.
+            let timeMin, timeMax;
+            if (task.dueDate) {
+                const dateStr = task.dueDate;
+                timeMin = new Date(dateStr + 'T00:00:00').toISOString();
+                timeMax = new Date(dateStr + 'T23:59:59').toISOString();
+            } else {
+                // If no due date, search only within +/- 1 day
+                const now = new Date();
+                timeMin = new Date(now.getTime() - 24*60*60*1000).toISOString();
+                timeMax = new Date(now.getTime() + 24*60*60*1000).toISOString();
+            }
+
+            const request = await gapi.client.calendar.events.list({
+                'calendarId': calendarId,
+                'timeMin': timeMin,
+                'timeMax': timeMax,
+                'singleEvents': true,
+                'orderBy': 'startTime'
+            });
+
+            const events = (request && request.result && request.result.items) || [];
+            console.log('📋 Found', events.length, 'events in fallback time window');
+
+            const matching = events.filter(ev => (ev.description || '').includes(`TaskFlowID:${task.id}`));
+            if (matching.length === 0) {
+                console.log('ℹ️ No TaskFlowID matching events found');
+                return false;
+            }
+
+            // Delete matched events (typically should be 0 or 1)
+            let deleted = 0;
+            for (const ev of matching) {
+                try {
+                    await calendarAPICall('DELETE', `/calendars/${calendarId}/events/${ev.id}`);
+                    deleted++;
+                    console.log('✅ Deleted fallback-matched event:', ev.id);
+                } catch (e) {
+                    console.error('❌ Failed to delete fallback event:', ev.id, e);
+                }
+            }
+
+            return deleted > 0;
         }
         
     } catch (err) {
