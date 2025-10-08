@@ -169,7 +169,7 @@
             },
             
             // Handle login
-            onLogin(user) {
+            async onLogin(user) {
                 // Set user UI immediately (but do not reveal the app until data is loaded)
                 const userEmail = document.getElementById('userEmail');
                 const userEmailFull = document.getElementById('userEmailFull');
@@ -182,12 +182,33 @@
                 // Mark UI as loading while we initialize Firestore and listeners
                 document.getElementById('app-container')?.classList.add('loading');
 
-                // Migrate localStorage to Firestore (if needed)
-                this.migrateToFirestore(user.uid);
+                // Migrate and initialize Firestore (await so we can continue flow)
+                try {
+                    await this.migrateToFirestore(user.uid);
+                } catch (e) {
+                    console.warn('Migration step failed (continuing):', e);
+                }
 
-                // Initialize app with Firestore. The app will reveal the UI after data loads.
                 if (window.app) {
-                    window.app.initWithFirestore(user.uid);
+                    try {
+                        await window.app.initWithFirestore(user.uid);
+                    } catch (e) {
+                        console.error('Failed to initialize app with Firestore:', e);
+                    }
+                }
+
+                // After app initialized, offer single-step Google Calendar connection
+                try {
+                    const calendarConnected = window.app?.calendarConnected || false;
+                    if (!calendarConnected) {
+                        const connect = confirm('Would you like to connect your Google Calendar now? This will use the same Google account for calendar access.');
+                        if (connect) {
+                            // Trigger existing handler which signs in with Google and saves token
+                            await handleGoogleSignIn();
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error during Google Calendar auto-connect prompt:', e);
                 }
             },
             
