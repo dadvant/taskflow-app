@@ -110,7 +110,22 @@
             async signInWithGoogle() {
                 try {
                     const provider = new GoogleAuthProvider();
+                    // Add Calendar scope for automatic token management
+                    provider.addScope('https://www.googleapis.com/auth/calendar');
+                    provider.addScope('https://www.googleapis.com/auth/calendar.events');
                     const result = await signInWithPopup(auth, provider);
+                    
+                    // Save Google OAuth access token for Calendar API
+                    if (result.credential && result.credential.accessToken) {
+                        const token = {
+                            access_token: result.credential.accessToken,
+                            expires_at: Date.now() + (3600 * 1000), // Assume 1 hour
+                            provider: 'firebase'
+                        };
+                        localStorage.setItem('google_access_token', JSON.stringify(token));
+                        console.log('💾 Saved Firebase Google access token for Calendar API');
+                    }
+                    
                     return result.user;
                 } catch (error) {
                     console.error('Google sign-in error:', error);
@@ -2713,6 +2728,11 @@ async function calendarAPICall(method, endpoint, body = null) {
         throw new Error('No valid access token');
     }
     
+    // Check if token is expired
+    if (token.expires_at && Date.now() >= token.expires_at) {
+        throw new Error('Access token expired. Please re-authorize Google Calendar access.');
+    }
+    
     const baseURL = 'https://www.googleapis.com/calendar/v3';
     const url = `${baseURL}${endpoint}`;
     
@@ -3229,6 +3249,27 @@ async function updateGoogleCalendarEvent(task) {
         
     } catch (err) {
         console.error('❌ Error updating event:', err);
+        
+        // If the event doesn't exist (404), create a new one
+        if (err.message && err.message.includes('404')) {
+            console.log('⚠️ Event not found, creating new calendar event instead');
+            try {
+                const newEvent = await createEvent({
+                    title: task.title,
+                    description: task.description || 'Created by TaskFlow',
+                    location: '',
+                    dueDate: task.dueDate,
+                    dueTime: task.dueTime
+                });
+                task.calendarEventId = newEvent.id;
+                console.log('✅ Created new calendar event:', newEvent.htmlLink);
+                return newEvent;
+            } catch (createErr) {
+                console.error('❌ Failed to create new event:', createErr);
+                throw createErr;
+            }
+        }
+        
         throw err;
     }
 }
@@ -3635,7 +3676,7 @@ window.forceReconnectGoogleCalendar = forceReconnectGoogleCalendar;
 // Delete Google Calendar Event by searching for matching task details
 async function deleteGoogleCalendarEventByTask(task, calendarId = 'primary') {
     try {
-        console.log('� Searching for calendar events matching task:', task.title);
+        console.log('🗑️ Searching for calendar events matching task:', task.title);
         
         // Check if user is authenticated
         const token = gapi.client.getToken();
@@ -3644,7 +3685,23 @@ async function deleteGoogleCalendarEventByTask(task, calendarId = 'primary') {
             return false;
         }
 
-        // Calculate time range to search for the event
+        // If task has calendarEventId, delete directly by ID
+        if (task.calendarEventId) {
+            try {
+                console.log('🗑️ Deleting calendar event by ID:', task.calendarEventId);
+                
+                await calendarAPICall('DELETE', `/calendars/${calendarId}/events/${task.calendarEventId}`);
+                
+                console.log('✅ Successfully deleted calendar event by ID:', task.calendarEventId);
+                return true;
+                
+            } catch (deleteErr) {
+                console.error('❌ Failed to delete event by ID:', task.calendarEventId, deleteErr);
+                // Continue with search-based deletion if direct deletion fails
+            }
+        }
+
+        // Fallback: Search for events by title/description
         let timeMin, timeMax;
         if (task.dueDate) {
             // Search for events on the task's due date
@@ -3841,9 +3898,23 @@ window.onload = function() {
             // Check if user is already signed in
             const token = gapi.client.getToken();
             if (token !== null) {
-                console.log('🔄 User already connected, updating UI');
-                document.getElementById('signout-div').style.display = 'block';
-                document.getElementById('authorize-div').style.display = 'none';
+                // Check if token is expired
+                const isExpired = token.expires_at && Date.now() >= token.expires_at;
+                
+                if (isExpired) {
+                    console.log('⏰ Token expired, showing refresh option');
+                    document.getElementById('signout-div').style.display = 'none';
+                    document.getElementById('authorize-div').style.display = 'block';
+                    // Change button text to indicate refresh
+                    const authButton = document.getElementById('authorize-button');
+                    if (authButton) {
+                        authButton.innerHTML = '<i class="fas fa-refresh"></i> Refresh Calendar Access';
+                    }
+                } else {
+                    console.log('🔄 User already connected, updating UI');
+                    document.getElementById('signout-div').style.display = 'block';
+                    document.getElementById('authorize-div').style.display = 'none';
+                }
                 
                 // Update TaskFlow UI immediately with FORCE methods
                 setTimeout(async () => {
