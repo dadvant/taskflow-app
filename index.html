@@ -2522,6 +2522,28 @@ function handleAuthClick() {
         try {
             console.log('✅ Auth success! Processing...');
             
+            // NOW load the Calendar API with the OAuth token
+            console.log('📦 Loading Calendar API v3 with OAuth token...');
+            try {
+                await gapi.client.load('calendar', 'v3');
+                console.log('✅ Calendar API v3 loaded successfully with OAuth');
+                
+                if (gapi.client.calendar && gapi.client.calendar.events) {
+                    console.log('✅ Calendar API events ready:', !!gapi.client.calendar.events.list);
+                }
+            } catch (calError) {
+                console.error('❌ Failed to load Calendar API after auth:', calError);
+            }
+            
+            // Also load OAuth2 API for user info
+            console.log('📦 Loading OAuth2 API v2...');
+            try {
+                await gapi.client.load('oauth2', 'v2');
+                console.log('✅ OAuth2 API v2 loaded successfully');
+            } catch (oauthError) {
+                console.error('❌ Failed to load OAuth2 API:', oauthError);
+            }
+            
             // Save token
             const token = gapi.client.getToken();
             if (token) {
@@ -3928,51 +3950,17 @@ window.onload = function() {
             try {
                 console.log('📦 Initializing Google API client...');
                 
-                // Set API key directly to avoid 403 errors on discovery endpoint
+                // IMPORTANT: Calendar API v3 requires OAuth, can't be loaded with just API key
+                // We'll load it AFTER user authorizes with OAuth
+                console.log('ℹ️ Calendar API will be loaded after OAuth authorization');
+                console.log('ℹ️ This is normal - Calendar API requires user permission');
+                
+                // Just set the API key for now (used for public APIs only)
                 gapi.client.setApiKey(API_KEY);
-                console.log('✅ API key set');
+                console.log('✅ API key set (will be used after authorization)');
                 
-                // Load Calendar API manually
-                console.log('📦 Loading Calendar API v3...');
-                try {
-                    await gapi.client.load('calendar', 'v3');
-                    console.log('✅ Calendar API v3 loaded successfully');
-                    
-                    // Verify calendar API is available
-                    if (gapi.client.calendar && gapi.client.calendar.events) {
-                        console.log('✅ Calendar API is ready with events:', !!gapi.client.calendar.events);
-                    } else {
-                        console.warn('⚠️ Calendar API loaded but events not available');
-                    }
-                } catch (calError) {
-                    console.error('❌ Failed to load Calendar API:', calError);
-                    console.error('Calendar API Error details:', {
-                        message: calError.message,
-                        status: calError.status,
-                        result: calError.result
-                    });
-                }
-                
-                // Load OAuth2 API for getting user info
-                console.log('📦 Loading OAuth2 API v2...');
-                try {
-                    await gapi.client.load('oauth2', 'v2');
-                    console.log('✅ OAuth2 API v2 loaded successfully');
-                    
-                    // Verify oauth2 API is available
-                    if (gapi.client.oauth2 && gapi.client.oauth2.userinfo) {
-                        console.log('✅ OAuth2 userinfo API is ready');
-                    } else {
-                        console.warn('⚠️ OAuth2 API loaded but userinfo not available');
-                    }
-                } catch (oauthError) {
-                    console.error('❌ Failed to load OAuth2 API:', oauthError);
-                    console.error('OAuth2 API Error details:', {
-                        message: oauthError.message,
-                        status: oauthError.status,
-                        result: oauthError.result
-                    });
-                }
+                // Note: We skip loading Calendar API here because it will fail with 403
+                // The API will be automatically available after OAuth token is set
                 
                 // Restore saved token if it exists AND is valid
                 const savedToken = localStorage.getItem('google_access_token');
@@ -3994,6 +3982,28 @@ window.onload = function() {
                         } else {
                             gapi.client.setToken(token);
                             console.log('🔄 Restored valid Google access token from localStorage');
+                            
+                            // Load Calendar API now that we have a valid token
+                            console.log('📦 Loading Calendar API v3 with restored token...');
+                            try {
+                                await gapi.client.load('calendar', 'v3');
+                                console.log('✅ Calendar API v3 loaded successfully');
+                                
+                                if (gapi.client.calendar && gapi.client.calendar.events) {
+                                    console.log('✅ Calendar API events ready');
+                                }
+                            } catch (calError) {
+                                console.error('❌ Failed to load Calendar API:', calError);
+                            }
+                            
+                            // Also load OAuth2 API
+                            console.log('📦 Loading OAuth2 API v2...');
+                            try {
+                                await gapi.client.load('oauth2', 'v2');
+                                console.log('✅ OAuth2 API v2 loaded successfully');
+                            } catch (oauthError) {
+                                console.error('❌ Failed to load OAuth2 API:', oauthError);
+                            }
                             
                             // Verify token was set
                             const verifyToken = gapi.client.getToken();
