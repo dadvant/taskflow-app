@@ -6606,11 +6606,13 @@ Calendar event will be created separately.`);
             tomorrow.setDate(today.getDate() + 1);
             result.suggestedDate = tomorrow.toISOString().split('T')[0];
             result.confidence += 30;
+            console.log('🤖 Parsed "tomorrow":', result.suggestedDate);
         }
         // Pattern 3: "today"
         else if (lowercaseText.includes('today')) {
             result.suggestedDate = today.toISOString().split('T')[0];
             result.confidence += 30;
+            console.log('🤖 Parsed "today":', result.suggestedDate);
         }
         // Pattern 4: "next week" or "next week same day"
         else if (lowercaseText.match(/next\s+week/)) {
