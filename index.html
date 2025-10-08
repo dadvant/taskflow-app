@@ -6466,25 +6466,27 @@ Calendar event will be created separately.`);
         if (autoCalendarEnabled && task.dueDate) {
             console.log('📅 Auto-creating calendar event for:', task.title);
             
-            setTimeout(async () => {
-                try {
-                    const result = await createGoogleCalendarEventWithRetry(task);
-                    
-                    if (result) {
-                        console.log('✅ Calendar event created:', result.htmlLink);
-                        task.calendarEventId = result.id; // Store event ID for deletion later
-                        this.saveTasks();
-                        this.showNotification(`📅 Calendar event created!`, 'success');
+            setTimeout(() => {
+                (async () => {
+                    try {
+                        const result = await createGoogleCalendarEventWithRetry(task);
+                        
+                        if (result) {
+                            console.log('✅ Calendar event created:', result.htmlLink);
+                            task.calendarEventId = result.id; // Store event ID for deletion later
+                            this.saveTasks();
+                            this.showNotification(`📅 Calendar event created!`, 'success');
+                        }
+                    } catch (error) {
+                        console.error('❌ Calendar event creation failed:', error);
+                        // Show user-friendly error message
+                        if (error.message.includes('TOKEN_')) {
+                            this.showNotification(`⚠️ Calendar sync failed: Please reconnect Google Calendar`, 'warning');
+                        } else if (!error.message.includes('not authenticated')) {
+                            this.showNotification(`Calendar event failed: ${error.message}`, 'warning');
+                        }
                     }
-                } catch (error) {
-                    console.error('❌ Calendar event creation failed:', error);
-                    // Show user-friendly error message
-                    if (error.message.includes('TOKEN_')) {
-                        this.showNotification(`⚠️ Calendar sync failed: Please reconnect Google Calendar`, 'warning');
-                    } else if (!error.message.includes('not authenticated')) {
-                        this.showNotification(`Calendar event failed: ${error.message}`, 'warning');
-                    }
-                }
+                })();
             }, 500);
         } else {
             console.log('📅 Auto-calendar skipped - enabled:', autoCalendarEnabled, 'hasDate:', !!task.dueDate);
