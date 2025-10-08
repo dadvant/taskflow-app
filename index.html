@@ -201,7 +201,7 @@
                 try {
                     const calendarConnected = window.app?.calendarConnected || false;
                     if (!calendarConnected) {
-                        const connect = confirm('Would you like to connect your Google Calendar now? This will use the same Google account for calendar access.');
+                        const connect = await showConfirm('Connect Google Calendar', 'Would you like to connect your Google Calendar now? This will use the same Google account for calendar access.');
                         if (connect) {
                             // Trigger existing handler which signs in with Google and saves token
                             await handleGoogleSignIn();
@@ -943,6 +943,22 @@
                         </div>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reusable confirmation modal (replaces window.confirm) -->
+    <div id="confirmModal" class="modal" style="z-index:11000; display:none;">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3 id="confirmModalTitle">Confirm</h3>
+            </div>
+            <div class="modal-body" style="padding:20px;">
+                <p id="confirmModalMessage" style="white-space:pre-wrap; color:var(--text-primary);"></p>
+            </div>
+            <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; padding:12px 20px 20px;">
+                <button id="confirmModalCancel" class="btn">Cancel</button>
+                <button id="confirmModalOk" class="btn btn--primary">OK</button>
             </div>
         </div>
     </div>
@@ -4191,7 +4207,7 @@ class TaskFlowEnhanced {
             // (This helps users who expect a fresh account to start empty)
             if (existingTasks.length > 0 && this.tasks.length === 0) {
                 try {
-                    const clear = confirm('Cloud tasks detected for this account. Do you want to delete all cloud tasks and start fresh on this device? Click OK to delete cloud tasks, Cancel to keep them.');
+                    const clear = await showConfirm('Clear cloud tasks?', 'Cloud tasks detected for this account. Do you want to delete all cloud tasks and start fresh on this device? Click OK to delete cloud tasks, Cancel to keep them.');
                     if (clear) {
                         console.log('🗑️ User opted to clear cloud tasks. Deleting...');
                         for (const t of existingTasks) {
@@ -9243,6 +9259,34 @@ window.addEventListener('load', () => {
             } catch (error) {
                 console.error('Sign in failed:', error);
             }
+        }
+
+        // Reusable confirm modal that returns a Promise<boolean>
+        function showConfirm(title, message) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('confirmModal');
+                const msg = document.getElementById('confirmModalMessage');
+                const ttl = document.getElementById('confirmModalTitle');
+                const ok = document.getElementById('confirmModalOk');
+                const cancel = document.getElementById('confirmModalCancel');
+
+                ttl.textContent = title || 'Confirm';
+                msg.textContent = message || '';
+                modal.style.display = 'block';
+
+                function cleanup(result) {
+                    modal.style.display = 'none';
+                    ok.removeEventListener('click', onOk);
+                    cancel.removeEventListener('click', onCancel);
+                    resolve(result);
+                }
+
+                function onOk() { cleanup(true); }
+                function onCancel() { cleanup(false); }
+
+                ok.addEventListener('click', onOk);
+                cancel.addEventListener('click', onCancel);
+            });
         }
         
         // Email Sign In
