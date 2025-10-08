@@ -3975,13 +3975,13 @@ window.onload = function() {
         });
     }
 
-    // Load Google Identity Services with proper popup configuration
+    // Load Google Identity Services with proper redirect configuration for deployed apps
     if (typeof google !== 'undefined' && google.accounts) {
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: SCOPES,
             callback: '', // EMPTY - callbacks set individually
-            ux_mode: 'popup', // Force popup mode to prevent redirect loops
+            ux_mode: 'redirect', // Use redirect mode for deployed apps to avoid popup blocking
             select_account: true, // Allow account selection
         });
         gisInited = true;
