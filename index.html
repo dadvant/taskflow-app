@@ -6587,7 +6587,7 @@ Calendar event will be created separately.`);
 
         // ENHANCED DATE PARSING
         const now = new Date();
-        const today = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()); // Use UTC date for consistency
+        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())); // Create UTC date
         console.log('🤖 Date parsing - Today (UTC):', today.toISOString().split('T')[0], 'Text:', lowercaseText);
         
         // Pattern 1: "in X days" or "X days from now" (supports both digits and words)
@@ -6597,7 +6597,7 @@ Calendar event will be created separately.`);
             const daysInput = inDaysMatch[1].toLowerCase();
             const daysToAdd = wordToNumber[daysInput] || parseInt(daysInput);
             const targetDate = new Date(today);
-            targetDate.setDate(today.getDate() + daysToAdd);
+            targetDate.setUTCDate(today.getUTCDate() + daysToAdd);
             result.suggestedDate = targetDate.toISOString().split('T')[0];
             result.confidence += 35;
             result.suggestedTitle = result.suggestedTitle.replace(inDaysMatch[0], '').trim();
@@ -6606,7 +6606,7 @@ Calendar event will be created separately.`);
         // Pattern 2: "tomorrow" - MUST check BEFORE other patterns
         else if (lowercaseText.includes('tomorrow')) {
             const tomorrow = new Date(today);
-            tomorrow.setDate(today.getDate() + 1);
+            tomorrow.setUTCDate(today.getUTCDate() + 1);
             result.suggestedDate = tomorrow.toISOString().split('T')[0];
             result.confidence += 30;
             result.suggestedTitle = result.suggestedTitle.replace(/tomorrow/gi, '').trim();
@@ -6622,7 +6622,7 @@ Calendar event will be created separately.`);
         // Pattern 4: "next week" or "next week same day"
         else if (lowercaseText.match(/next\s+week/)) {
             const nextWeek = new Date(today);
-            nextWeek.setDate(today.getDate() + 7);
+            nextWeek.setUTCDate(today.getUTCDate() + 7);
             result.suggestedDate = nextWeek.toISOString().split('T')[0];
             result.confidence += 30;
             result.suggestedTitle = result.suggestedTitle.replace(/next\s+week/gi, '').trim();
@@ -6631,7 +6631,7 @@ Calendar event will be created separately.`);
         // Pattern 5: "in a week" or "in 1 week"
         else if (lowercaseText.match(/in\s+(?:a|1)\s+week/)) {
             const nextWeek = new Date(today);
-            nextWeek.setDate(today.getDate() + 7);
+            nextWeek.setUTCDate(today.getUTCDate() + 7);
             result.suggestedDate = nextWeek.toISOString().split('T')[0];
             result.confidence += 30;
             result.suggestedTitle = result.suggestedTitle.replace(/in\s+(?:a|1)\s+week/gi, '').trim();
@@ -6642,7 +6642,7 @@ Calendar event will be created separately.`);
             const weeksInput = weeksMatch[1].toLowerCase();
             const weeksToAdd = wordToNumber[weeksInput] || parseInt(weeksInput);
             const targetDate = new Date(today);
-            targetDate.setDate(today.getDate() + (weeksToAdd * 7));
+            targetDate.setUTCDate(today.getUTCDate() + (weeksToAdd * 7));
             result.suggestedDate = targetDate.toISOString().split('T')[0];
             result.confidence += 30;
             result.suggestedTitle = result.suggestedTitle.replace(weeksMatch[0], '').trim();
@@ -6656,7 +6656,7 @@ Calendar event will be created separately.`);
             if (nextDayMatch) {
                 const targetDayName = nextDayMatch[1];
                 const targetDayIndex = dayNames.indexOf(targetDayName);
-                const currentDayIndex = today.getDay();
+                const currentDayIndex = today.getUTCDay();
                 
                 // Calculate days until target day
                 let daysUntil = targetDayIndex - currentDayIndex;
@@ -6665,7 +6665,7 @@ Calendar event will be created separately.`);
                 }
                 
                 const targetDate = new Date(today);
-                targetDate.setDate(today.getDate() + daysUntil);
+                targetDate.setUTCDate(today.getUTCDate() + daysUntil);
                 result.suggestedDate = targetDate.toISOString().split('T')[0];
                 result.confidence += 35;
                 result.suggestedTitle = result.suggestedTitle.replace(nextDayMatch[0], '').trim();
