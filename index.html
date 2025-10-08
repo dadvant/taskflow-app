@@ -2472,9 +2472,7 @@
 // GOOGLE CALENDAR CODE - CONFIGURED FOR YOUR PROJECT
 // Get your OAuth Client ID from: https://console.cloud.google.com/apis/credentials
 const CLIENT_ID = '836379022235-f50uv8i0v2pl1rmj47dkt8ue42d8kbii.apps.googleusercontent.com';
-const API_KEY = 'AIzaSyDGA7PkR2BXN2bx_VCm5yZdRJkuyxWj_rs'; // Your Firebase API key
-const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
-const OAUTH2_DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/oauth2/v2/rest';
+const API_KEY = 'AIzaSyDGA7PkR2BXN2bx_VCm5yZdRJkuyxWj_rs';
 const SCOPES = 'https://www.googleapis.com/auth/calendar';
 
 let tokenClient;
@@ -2522,29 +2520,7 @@ function handleAuthClick() {
         try {
             console.log('✅ Auth success! Processing...');
             
-            // NOW load the Calendar API with the OAuth token
-            console.log('📦 Loading Calendar API v3 with OAuth token...');
-            try {
-                await gapi.client.load('calendar', 'v3');
-                console.log('✅ Calendar API v3 loaded successfully with OAuth');
-                
-                if (gapi.client.calendar && gapi.client.calendar.events) {
-                    console.log('✅ Calendar API events ready:', !!gapi.client.calendar.events.list);
-                }
-            } catch (calError) {
-                console.error('❌ Failed to load Calendar API after auth:', calError);
-            }
-            
-            // Also load OAuth2 API for user info
-            console.log('📦 Loading OAuth2 API v2...');
-            try {
-                await gapi.client.load('oauth2', 'v2');
-                console.log('✅ OAuth2 API v2 loaded successfully');
-            } catch (oauthError) {
-                console.error('❌ Failed to load OAuth2 API:', oauthError);
-            }
-            
-            // Save token
+            // Save token FIRST
             const token = gapi.client.getToken();
             if (token) {
                 if (!token.expires_at && token.expires_in) {
@@ -2556,58 +2532,29 @@ function handleAuthClick() {
                 console.log('💾 Token saved');
             }
             
-            // Get user email and save to localStorage
+            // Get user email using tokeninfo endpoint (doesn't require API enablement)
             let email = null;
             try {
-                // First, try to get email from OAuth2 userinfo API
-                if (gapi.client.oauth2 && gapi.client.oauth2.userinfo) {
-                    console.log('🔍 Attempting to fetch user info from Google OAuth2 API...');
-                    const userInfo = await gapi.client.oauth2.userinfo.get();
-                    console.log('📥 User info response:', userInfo);
-                    email = userInfo.result.email;
-                    if (email) {
-                        localStorage.setItem('google_account_email', email);
-                        console.log('📧 Email saved to localStorage:', email);
-                    }
-                } else {
-                    console.warn('⚠️ OAuth2 userinfo API not available');
-                    
-                    // Fallback: Try to get email from token (Google tokens often include email in payload)
-                    const currentToken = gapi.client.getToken();
-                    if (currentToken && currentToken.access_token) {
-                        console.log('🔍 Attempting to fetch user info via direct API call...');
-                        // Use fetch with the access token to get user info
-                        const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-                            headers: {
-                                'Authorization': `Bearer ${currentToken.access_token}`
-                            }
-                        });
-                        if (response.ok) {
-                            const userData = await response.json();
-                            email = userData.email;
-                            if (email) {
-                                localStorage.setItem('google_account_email', email);
-                                console.log('📧 Email saved to localStorage via direct API:', email);
-                            }
+                const currentToken = gapi.client.getToken();
+                if (currentToken && currentToken.access_token) {
+                    console.log('🔍 Fetching user info via tokeninfo endpoint...');
+                    const response = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${currentToken.access_token}`);
+                    if (response.ok) {
+                        const tokenInfo = await response.json();
+                        console.log('📥 Token info response:', tokenInfo);
+                        email = tokenInfo.email;
+                        if (email) {
+                            localStorage.setItem('google_account_email', email);
+                            console.log('📧 Email saved to localStorage:', email);
                         } else {
-                            console.error('❌ Failed to fetch user info:', response.status, response.statusText);
+                            console.warn('⚠️ No email in tokeninfo response');
                         }
+                    } else {
+                        console.error('❌ Tokeninfo request failed:', response.status, response.statusText);
                     }
-                }
-                
-                // Verify it was saved
-                if (email) {
-                    const verified = localStorage.getItem('google_account_email');
-                    console.log('✅ Email verified in localStorage:', verified);
-                } else {
-                    console.error('❌ No email obtained from Google');
                 }
             } catch (emailError) {
-                console.error('❌ Failed to get user email - Full error:', emailError);
-                console.error('❌ Error message:', emailError.message);
-                console.error('❌ Error stack:', emailError.stack);
-                
-                // Last resort: Try to get from localStorage as fallback
+                console.error('❌ Failed to get user email:', emailError);
                 email = localStorage.getItem('google_account_email');
                 console.log('📧 Using email from localStorage fallback:', email);
             }
@@ -2758,6 +2705,40 @@ function handleSignoutClick() {
 }
 
 /**
+ * Helper: Make Calendar API REST calls (bypasses blocked gapi.client.calendar)
+ */
+async function calendarAPICall(method, endpoint, body = null) {
+    const token = gapi.client.getToken();
+    if (!token || !token.access_token) {
+        throw new Error('No valid access token');
+    }
+    
+    const baseURL = 'https://www.googleapis.com/calendar/v3';
+    const url = `${baseURL}${endpoint}`;
+    
+    const options = {
+        method: method,
+        headers: {
+            'Authorization': `Bearer ${token.access_token}`,
+            'Content-Type': 'application/json'
+        }
+    };
+    
+    if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+        options.body = JSON.stringify(body);
+    }
+    
+    const response = await fetch(url, options);
+    
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Calendar API ${method} ${endpoint} failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    return await response.json();
+}
+
+/**
  * Create a calendar event (EXACT WORKING VERSION FROM googlecalendar/app.js)
  */
 async function createEvent(eventDetails) {
@@ -2784,12 +2765,9 @@ async function createEvent(eventDetails) {
             },
         };
 
-        const request = await gapi.client.calendar.events.insert({
-            calendarId: 'primary',
-            resource: event,
-        });
-
-        return request.result;
+        // Use direct REST API call instead of gapi.client.calendar
+        const result = await calendarAPICall('POST', '/calendars/primary/events', event);
+        return result;
     } catch (err) {
         console.error('Error creating event:', err);
         throw err;
@@ -2829,24 +2807,21 @@ async function createTestEvent() {
         
         console.log('� Creating event:', eventDetails);
         
-        // Use the exact same createEvent function that works
-        const request = await gapi.client.calendar.events.insert({
-            'calendarId': 'primary',
-            'resource': {
-                'summary': eventDetails.title,
-                'description': eventDetails.description,
-                'start': {
-                    'dateTime': eventDetails.startDateTime,
-                    'timeZone': Intl.DateTimeFormat().resolvedOptions().timeZone
-                },
-                'end': {
-                    'dateTime': eventDetails.endDateTime,
-                    'timeZone': Intl.DateTimeFormat().resolvedOptions().timeZone
-                }
+        // Use direct REST API call
+        const eventResource = {
+            'summary': eventDetails.title,
+            'description': eventDetails.description,
+            'start': {
+                'dateTime': eventDetails.startDateTime,
+                'timeZone': Intl.DateTimeFormat().resolvedOptions().timeZone
+            },
+            'end': {
+                'dateTime': eventDetails.endDateTime,
+                'timeZone': Intl.DateTimeFormat().resolvedOptions().timeZone
             }
-        });
+        };
         
-        const result = request.result;
+        const result = await calendarAPICall('POST', '/calendars/primary/events', eventResource);
         
         console.log('✅ Event created successfully:', result);
         
@@ -3135,19 +3110,8 @@ async function createGoogleCalendarEventSimple(task) {
         
         console.log('📝 Event object:', event);
         
-        // Ensure Calendar API is loaded
-        if (!gapi.client.calendar) {
-            console.log('📦 Calendar API not loaded, loading now...');
-            await gapi.client.load('calendar', 'v3');
-            console.log('✅ Calendar API loaded');
-        }
-        
-        const request = await gapi.client.calendar.events.insert({
-            'calendarId': 'primary',
-            'resource': event
-        });
-        
-        const result = request.result;
+        // Use direct REST API call (no need to load Calendar API)
+        const result = await calendarAPICall('POST', '/calendars/primary/events', event);
         console.log('✅ Event created successfully:', result.htmlLink);
         return result;
         
@@ -3258,21 +3222,8 @@ async function updateGoogleCalendarEvent(task) {
         
         console.log('📝 Updated event object:', event);
         
-        // Ensure Calendar API is loaded
-        if (!gapi.client.calendar) {
-            console.log('📦 Calendar API not loaded, loading now...');
-            await gapi.client.load('calendar', 'v3');
-            console.log('✅ Calendar API loaded');
-        }
-        
-        // Update the event using Google Calendar API
-        const request = await gapi.client.calendar.events.update({
-            'calendarId': 'primary',
-            'eventId': task.calendarEventId,
-            'resource': event
-        });
-        
-        const result = request.result;
+        // Use direct REST API call
+        const result = await calendarAPICall('PUT', `/calendars/primary/events/${task.calendarEventId}`, event);
         console.log('✅ Event updated successfully:', result.htmlLink);
         return result;
         
@@ -3325,7 +3276,8 @@ function diagnoseGoogleCalendar() {
                 }
             }
             
-            checks['Calendar API ready'] = !!gapi.client.calendar;
+            // Calendar API check - we use REST API now, so just check if token is valid
+            checks['Calendar API ready'] = 'Using REST API (no client library needed)';
         } catch (e) {
             console.error('Error checking authentication:', e);
         }
@@ -3950,17 +3902,11 @@ window.onload = function() {
             try {
                 console.log('📦 Initializing Google API client...');
                 
-                // IMPORTANT: Calendar API v3 requires OAuth, can't be loaded with just API key
-                // We'll load it AFTER user authorizes with OAuth
-                console.log('ℹ️ Calendar API will be loaded after OAuth authorization');
-                console.log('ℹ️ This is normal - Calendar API requires user permission');
-                
-                // Just set the API key for now (used for public APIs only)
+                // Set API key (needed for some Calendar API discovery calls)
                 gapi.client.setApiKey(API_KEY);
-                console.log('✅ API key set (will be used after authorization)');
+                console.log('✅ API key set');
                 
-                // Note: We skip loading Calendar API here because it will fail with 403
-                // The API will be automatically available after OAuth token is set
+                console.log('ℹ️ Calendar operations use REST API with OAuth token');
                 
                 // Restore saved token if it exists AND is valid
                 const savedToken = localStorage.getItem('google_access_token');
@@ -4570,8 +4516,21 @@ class TaskFlowEnhanced {
         }
         
         try {
-            const response = await gapi.client.calendar.calendarList.list();
-            const calendars = response.result.items || [];
+            // Use direct REST API call instead of gapi.client.calendar
+            const token = gapi.client.getToken();
+            const response = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
+                headers: {
+                    'Authorization': `Bearer ${token.access_token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Calendar API error: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            const calendars = data.items || [];
             
             console.log('📅 Found', calendars.length, 'calendars:', calendars.map(c => c.summary));
             
