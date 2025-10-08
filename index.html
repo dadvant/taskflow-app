@@ -170,9 +170,7 @@
             
             // Handle login
             onLogin(user) {
-                document.getElementById('loginModal')?.classList.remove('show');
-                document.getElementById('app-container')?.style.removeProperty('display');
-                
+                // Set user UI immediately (but do not reveal the app until data is loaded)
                 const userEmail = document.getElementById('userEmail');
                 const userEmailFull = document.getElementById('userEmailFull');
                 const userAvatar = document.getElementById('userAvatar');
@@ -180,11 +178,14 @@
                 if (userEmail) userEmail.textContent = user.email || 'User';
                 if (userEmailFull) userEmailFull.textContent = user.email || 'User';
                 if (userAvatar) userAvatar.textContent = (user.email?.[0] || 'U').toUpperCase();
-                
-                // Migrate localStorage to Firestore
+
+                // Mark UI as loading while we initialize Firestore and listeners
+                document.getElementById('app-container')?.classList.add('loading');
+
+                // Migrate localStorage to Firestore (if needed)
                 this.migrateToFirestore(user.uid);
-                
-                // Initialize app with Firestore
+
+                // Initialize app with Firestore. The app will reveal the UI after data loads.
                 if (window.app) {
                     window.app.initWithFirestore(user.uid);
                 }
@@ -4159,6 +4160,14 @@ class TaskFlowEnhanced {
                 window.app.render();
             }
             
+            // Reveal app UI now that Firestore has been initialized and listeners set
+            document.getElementById('loginModal')?.classList.remove('show');
+            const appContainer = document.getElementById('app-container');
+            if (appContainer) {
+                appContainer.style.removeProperty('display');
+                appContainer.classList.remove('loading');
+            }
+
             console.log('✅ Firebase initialization complete');
         } catch (error) {
             console.error('❌ Firebase initialization error:', error);
