@@ -4164,8 +4164,34 @@ class TaskFlowEnhanced {
             // Check if this is first login - migrate localStorage data
             console.log('📦 Checking for existing tasks...');
             const existingTasks = await window.FirebaseManager.getTasks(userId);
-            console.log('✅ Existing tasks:', existingTasks.length);
-            
+            console.log('✅ Existing tasks in cloud:', existingTasks.length);
+
+            // If cloud has tasks but the local app has none, ask user whether to clear cloud tasks
+            // (This helps users who expect a fresh account to start empty)
+            if (existingTasks.length > 0 && this.tasks.length === 0) {
+                try {
+                    const clear = confirm('Cloud tasks detected for this account. Do you want to delete all cloud tasks and start fresh on this device? Click OK to delete cloud tasks, Cancel to keep them.');
+                    if (clear) {
+                        console.log('🗑️ User opted to clear cloud tasks. Deleting...');
+                        for (const t of existingTasks) {
+                            try {
+                                await window.FirebaseManager.deleteTask(userId, t.id);
+                            } catch (delErr) {
+                                console.warn('❌ Failed to delete cloud task', t.id, delErr);
+                            }
+                        }
+                        // refresh existingTasks to empty
+                        console.log('✅ Cloud tasks cleared');
+                        // proceed with empty local state
+                    } else {
+                        console.log('ℹ️ User chose to keep cloud tasks');
+                    }
+                } catch (promptErr) {
+                    console.error('❌ Error during clear-cloud prompt:', promptErr);
+                }
+            }
+
+            // Migrate local tasks only if cloud is empty and we have local tasks
             if (existingTasks.length === 0 && this.tasks.length > 0) {
                 console.log('📦 Migrating localStorage data to Firestore...');
                 await window.FirebaseManager.migrateToFirestore(userId, this.tasks, this.projects);
