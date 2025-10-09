@@ -6659,6 +6659,8 @@ Calendar event will be created separately.`);
                 ...existingTask,
                 title: formData.title,
                 description: formData.description,
+                isShoppingList: !!formData.isShoppingList,
+                items: Array.isArray(formData.items) ? formData.items : [],
                 priority: this.convertPriorityToObject(formData.priority), // Convert string to object
                 project: formData.project,
                 tags: formData.tags,
@@ -6741,6 +6743,8 @@ Calendar event will be created separately.`);
             id: 'task_' + Date.now(),
             title: formData.title,
             description: formData.description,
+            isShoppingList: !!formData.isShoppingList,
+            items: Array.isArray(formData.items) ? formData.items : [],
             priority: this.convertPriorityToObject(formData.priority), // Convert string to object
             project: formData.project,
             tags: formData.tags,
@@ -9504,6 +9508,20 @@ Complete this task and stay productive!`;
         
         // Reset form
         document.getElementById('taskForm').reset();
+
+        // Clear top shopping editor rows and hide it
+        try {
+            const topTbody = document.querySelector('#topShoppingItemsTable tbody');
+            if (topTbody) topTbody.innerHTML = '';
+            const topEditor = document.getElementById('topShoppingEditor');
+            const descEl = document.getElementById('taskDescription');
+            if (topEditor) topEditor.style.display = 'none';
+            if (descEl) descEl.style.display = 'block';
+            const isShoppingEl = document.getElementById('isShoppingList');
+            if (isShoppingEl) isShoppingEl.checked = false;
+        } catch (err) {
+            console.warn('Could not clear top shopping editor during reset:', err);
+        }
         
         // Reset priority to default button
         document.querySelectorAll('.priority-option-fixed').forEach(btn => {
