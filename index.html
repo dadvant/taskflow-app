@@ -4421,28 +4421,54 @@ class TaskFlowEnhanced {
             console.log('📡 Setting up real-time listeners...');
             const app = this;
             window.FirebaseManager.listenToTasks(userId, (tasks) => {
-                console.log('📡 Real-time task update received');
+                console.log('📡 Real-time task update received', new Date().toISOString());
                 app.tasks = tasks;
-                if (window.app && window.app.render) {
-                    window.app.tasks = tasks;
-                    window.app.render();
+                // Update derived state before rendering so views relying on counts/projects/tags
+                // display correctly immediately after updates.
+                try {
+                    if (window.app) {
+                        window.app.tasks = tasks;
+                        if (typeof window.app.updateTaskCounts === 'function') window.app.updateTaskCounts();
+                        if (typeof window.app.updateProjectsList === 'function') window.app.updateProjectsList();
+                        if (typeof window.app.updateTagsList === 'function') window.app.updateTagsList();
+                        if (typeof window.app.updateStats === 'function') window.app.updateStats();
+                        if (window.app.render) window.app.render();
+                    }
+                } catch (listenerErr) {
+                    console.error('❌ Error handling realtime task update:', listenerErr);
                 }
             });
             
             window.FirebaseManager.listenToProjects(userId, (projects) => {
-                console.log('📡 Real-time project update received');
+                console.log('📡 Real-time project update received', new Date().toISOString());
                 app.projects = projects;
-                if (window.app && window.app.render) {
-                    window.app.projects = projects;
-                    window.app.render();
+                try {
+                    if (window.app) {
+                        window.app.projects = projects;
+                        if (typeof window.app.updateProjectsList === 'function') window.app.updateProjectsList();
+                        if (typeof window.app.updateTagsList === 'function') window.app.updateTagsList();
+                        if (typeof window.app.updateStats === 'function') window.app.updateStats();
+                        if (window.app.render) window.app.render();
+                    }
+                } catch (projErr) {
+                    console.error('❌ Error handling realtime project update:', projErr);
                 }
             });
             console.log('✅ Real-time listeners set up');
             
-            // Initial render
-            console.log('🎨 Rendering initial view...');
-            if (window.app && window.app.render) {
-                window.app.render();
+            // Ensure derived state is computed before the initial render so the views are correct.
+            console.log('🎨 Preparing initial render...', new Date().toISOString());
+            try {
+                if (window.app) {
+                    if (typeof window.app.updateTaskCounts === 'function') window.app.updateTaskCounts();
+                    if (typeof window.app.updateProjectsList === 'function') window.app.updateProjectsList();
+                    if (typeof window.app.updateTagsList === 'function') window.app.updateTagsList();
+                    if (typeof window.app.updateStats === 'function') window.app.updateStats();
+                    if (window.app.render) window.app.render();
+                }
+            } catch (initRenderErr) {
+                console.error('❌ Error during initial render preparation:', initRenderErr);
+                if (window.app && window.app.render) window.app.render();
             }
             
             // Reveal app UI now that Firestore has been initialized and listeners set
