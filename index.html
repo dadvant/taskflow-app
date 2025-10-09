@@ -875,7 +875,28 @@
 
                     <div class="form-group">
                         <label for="taskDescription">Description:</label>
-                        <textarea id="taskDescription" placeholder="Add more details..."></textarea>
+                        <!-- Dual-mode: freeform textarea (default) and a table-based editor for shopping lists -->
+                        <textarea id="taskDescription" placeholder="Add more details..." style="min-height:80px;"></textarea>
+
+                        <!-- Top shopping editor (hidden by default) - mirrors bottom editor structure -->
+                        <div id="topShoppingEditor" style="display:none; margin-top:12px;">
+                            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                                <strong>Items (top)</strong>
+                                <button type="button" class="btn btn--secondary btn--small" id="topAddItemRowBtn">Add row</button>
+                                <button type="button" class="btn btn--tertiary btn--small" id="toggleTopEditorMode" title="Toggle table/textarea">Switch to textarea</button>
+                            </div>
+                            <table id="topShoppingItemsTable" style="width:100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align:left; padding:6px; width:50%;">Name</th>
+                                        <th style="text-align:left; padding:6px; width:15%;">Qty</th>
+                                        <th style="text-align:left; padding:6px;">Comments</th>
+                                        <th style="width:40px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
                     </div>
 
                     <!-- Priority Selection - FIXED WIDTH -->
@@ -1021,8 +1042,10 @@
 
                     <!-- Shopping / Grocery List -->
                     <div class="form-group">
-                        <label for="isShoppingList">
-                            <input type="checkbox" id="isShoppingList"> This is a Shopping / Grocery list
+                        <label for="isShoppingList" style="display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="isShoppingList">
+                            <img src="assets/icons/shopping-cart.svg" alt="shopping" style="width:20px; height:20px; display:inline-block;">
+                            <span style="font-weight:600;">Shopping / Grocery list</span>
                         </label>
                         <div id="shoppingListEditor" style="display:none; margin-top: 12px;">
                             <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
@@ -9108,9 +9131,10 @@ Complete this task and stay productive!`;
             return;
         }
 
-        // Populate the add task modal with existing task data
-        document.getElementById('taskTitle').value = task.title;
-        document.getElementById('taskDescription').value = task.description || '';
+    // Populate the add task modal with existing task data
+    document.getElementById('taskTitle').value = task.title;
+    const descEl = document.getElementById('taskDescription');
+    document.getElementById('taskDescription').value = task.description || '';
         
         // Set priority - select the correct button
         const priorityValue = this.convertPriorityToString(task.priority);
@@ -9140,12 +9164,25 @@ Complete this task and stay productive!`;
         // Populate shopping list editor if this task is a shopping list
         const isShoppingEl = document.getElementById('isShoppingList');
         const editorTbody = document.querySelector('#shoppingItemsTable tbody');
-        if (isShoppingEl && editorTbody) {
+        const topEditorTbody = document.querySelector('#topShoppingItemsTable tbody');
+        if (isShoppingEl && editorTbody && topEditorTbody) {
             // Clear existing rows
             editorTbody.innerHTML = '';
+            topEditorTbody.innerHTML = '';
             if (task.isShoppingList && Array.isArray(task.items)) {
                 isShoppingEl.checked = true;
-                task.items.forEach(item => this._shoppingAddRow(item));
+                // Populate both editors so user sees the same content regardless of which they edit
+                task.items.forEach(item => {
+                    this._shoppingAddRow(item);
+                    this._shoppingAddTopRow(item);
+                });
+                // Show top editor by default when editing a shopping list
+                const topEditorEl = document.getElementById('topShoppingEditor');
+                const descEl2 = document.getElementById('taskDescription');
+                if (topEditorEl && descEl2) {
+                    topEditorEl.style.display = 'block';
+                    descEl2.style.display = 'none';
+                }
             } else {
                 isShoppingEl.checked = false;
             }
@@ -9471,8 +9508,12 @@ Complete this task and stay productive!`;
     initializeShoppingListEditor() {
         const isShoppingEl = document.getElementById('isShoppingList');
         const editor = document.getElementById('shoppingListEditor');
+        const topEditor = document.getElementById('topShoppingEditor');
+        const topAddRowBtn = document.getElementById('topAddItemRowBtn');
+        const topToggleBtn = document.getElementById('toggleTopEditorMode');
         const addRowBtn = document.getElementById('addItemRowBtn');
         const tbody = document.querySelector('#shoppingItemsTable tbody');
+        const topTbody = document.querySelector('#topShoppingItemsTable tbody');
 
         const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -9488,12 +9529,26 @@ Complete this task and stay productive!`;
             tr.querySelector('.remove-row').addEventListener('click', () => tr.remove());
         }
 
+        function addTopRow(item = { name: '', qty: '', comments: '' }) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding:6px;"><input type="text" class="item-name" value="${escapeHtml(item.name)}" style="width:100%"></td>
+                <td style="padding:6px;"><input type="text" class="item-qty" value="${escapeHtml(item.qty)}" style="width:80px"></td>
+                <td style="padding:6px;"><input type="text" class="item-comments" value="${escapeHtml(item.comments)}" style="width:100%"></td>
+                <td style="padding:6px; text-align:center;"><button type="button" class="btn btn--danger btn--small remove-row">✕</button></td>
+            `;
+            topTbody.appendChild(tr);
+            tr.querySelector('.remove-row').addEventListener('click', () => tr.remove());
+        }
+
         // expose addRow in instance for use when populating
         this._shoppingAddRow = addRow.bind(this);
+    this._shoppingAddTopRow = addTopRow.bind(this);
 
         if (isShoppingEl) {
             isShoppingEl.addEventListener('change', (e) => {
                 if (editor) editor.style.display = isShoppingEl.checked ? 'block' : 'none';
+                if (topEditor) topEditor.style.display = isShoppingEl.checked ? 'block' : 'none';
                 // If the editor was just enabled and has no rows, add a starter row
                 try {
                     const tbodyEl = document.querySelector('#shoppingItemsTable tbody');
@@ -9504,6 +9559,11 @@ Complete this task and stay productive!`;
                             const first = tbodyEl.querySelector('.item-name');
                             if (first) try { first.focus(); } catch (_) {}
                         }, 50);
+                    }
+                    // For top editor too
+                    const topTbodyEl = document.querySelector('#topShoppingItemsTable tbody');
+                    if (isShoppingEl.checked && topTbodyEl && topTbodyEl.children.length === 0) {
+                        this._shoppingAddTopRow({ name: '', qty: '', comments: '' });
                     }
                 } catch (err) {
                     console.warn('Could not auto-add shopping row:', err);
@@ -9516,11 +9576,44 @@ Complete this task and stay productive!`;
                 this._shoppingAddRow({ name: '', qty: '', comments: '' });
             });
         }
+
+        if (topAddRowBtn) {
+            topAddRowBtn.addEventListener('click', (e) => {
+                this._shoppingAddTopRow({ name: '', qty: '', comments: '' });
+            });
+        }
+
+        if (topToggleBtn) {
+            topToggleBtn.addEventListener('click', (e) => {
+                // toggle between showing textarea and showing top table editor
+                const topEditorEl = document.getElementById('topShoppingEditor');
+                const descEl = document.getElementById('taskDescription');
+                if (!topEditorEl || !descEl) return;
+                if (topEditorEl.style.display === 'none' || topEditorEl.style.display === '') {
+                    // show table and hide textarea
+                    topEditorEl.style.display = 'block';
+                    descEl.style.display = 'none';
+                    topToggleBtn.textContent = 'Switch to textarea';
+                } else {
+                    topEditorEl.style.display = 'none';
+                    descEl.style.display = 'block';
+                    topToggleBtn.textContent = 'Switch to table';
+                }
+            });
+        }
     }
 
     // When saving a task, serialize shopping list rows into task.items
     _serializeShoppingItems() {
-        const rows = Array.from(document.querySelectorAll('#shoppingItemsTable tbody tr'));
+        // Prefer top editor if visible (users working in Add modal top table)
+        const topEl = document.getElementById('topShoppingEditor');
+        let rows = [];
+        if (topEl && topEl.style.display && topEl.style.display !== 'none') {
+            rows = Array.from(document.querySelectorAll('#topShoppingItemsTable tbody tr'));
+        } else {
+            rows = Array.from(document.querySelectorAll('#shoppingItemsTable tbody tr'));
+        }
+
         return rows.map(r => ({
             name: r.querySelector('.item-name')?.value || '',
             qty: r.querySelector('.item-qty')?.value || '',
