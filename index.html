@@ -12,7 +12,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TaskFlow v3.0 (3864962) - Cloud Sync</title>
+    <title>TaskFlow v3.0 <span class="app-version">(3864962)</span> - Cloud Sync</title>
     <link rel="stylesheet" href="taskflow-styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
@@ -9815,6 +9815,30 @@ document.addEventListener('DOMContentLoaded', () => {
         deferredInstallPrompt = null;
     });
 });
+    </script>
+
+    <script>
+        // Load version from version.txt and update visible UI elements.
+        (async function(){
+            try {
+                const resp = await fetch('version.txt', {cache: 'no-store'});
+                if (!resp.ok) return;
+                const txt = (await resp.text()).trim();
+                if (!txt) return;
+                window.APP_VERSION = txt;
+                // Replace all elements marked with .app-version with the version text
+                document.querySelectorAll('.app-version').forEach(el => {
+                    // If the element contains parentheses, preserve surrounding text
+                    if (el.textContent && /\(.*\)/.test(el.textContent)) {
+                        el.textContent = `(${txt})`;
+                    } else {
+                        el.textContent = `TaskFlow v3.0 (${txt})`;
+                    }
+                });
+            } catch (e) {
+                console.warn('Could not load app version:', e);
+            }
+        })();
     </script>
 
     <script>
