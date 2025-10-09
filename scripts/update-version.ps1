@@ -38,6 +38,7 @@ if ($lastMsg -and $lastMsg -match 'chore\(version\): bump visible version') {
 }
 
 $indexPath = Join-Path $repoRoot 'index.html'
+ $versionPath = Join-Path $repoRoot 'version.txt'
 if (-not (Test-Path $indexPath)) {
     Write-Error "index.html not found at expected path: $indexPath"
     exit 1
@@ -56,8 +57,16 @@ if ($content -ne $original) {
     # Write the updated file
     $content | Set-Content -Path $indexPath -Encoding UTF8
 
+    # Also ensure version.txt reflects the current hash so runtime picks it up
+    try {
+        $hash | Out-File -FilePath $versionPath -Encoding UTF8 -Force
+        Write-Host "Wrote version.txt with $hash"
+    } catch {
+        Write-Warning "Failed to write version.txt: $_"
+    }
+
     # Stage and commit the change
-    git add -- "index.html"
+    git add -- "index.html" "$versionPath" 2>$null
     $msg = "chore(version): bump visible version to $hash"
 
     # Create a new commit so the change is recorded (post-commit hook context)
