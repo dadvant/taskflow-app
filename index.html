@@ -88,18 +88,55 @@
                     onAuthStateChanged(auth, async (user) => {
                         if (user) {
                             console.log('🔐 Firebase auth state: signed in as', user.email);
-                            // Hide login modal and reveal app container
-                            document.getElementById('loginModal')?.classList.remove('show');
-                            const appContainer = document.getElementById('app-container');
-                            if (appContainer) appContainer.style.display = '';
 
-                            // Call manager onLogin hook if present
+                            // Hide login modal and reveal app container immediately as a defensive measure
+                            try {
+                                document.getElementById('loginModal')?.classList.remove('show');
+                                const appContainer = document.getElementById('app-container');
+                                if (appContainer) {
+                                    appContainer.style.removeProperty('display');
+                                    appContainer.classList.remove('loading');
+                                }
+                            } catch (uiErr) {
+                                console.warn('UI reveal failed during auth state change:', uiErr);
+                            }
+
+                            // Call manager onLogin hook if present (this normally initializes Firestore)
                             try {
                                 if (typeof this.onLogin === 'function') {
                                     await this.onLogin(user);
                                 }
                             } catch (e) {
                                 console.error('Error during onLogin handler:', e);
+                            }
+
+                            // Fallback: if the app instance exists but Firestore init did not complete,
+                            // try to initialize it here to avoid leaving the UI empty.
+                            try {
+                                if (window.app) {
+                                    const needsInit = (!window.app.useFirestore) || (window.app.firebaseUserId !== user.uid);
+                                    if (needsInit && typeof window.app.initWithFirestore === 'function') {
+                                        console.log('ℹ️ Fallback: calling app.initWithFirestore from auth listener');
+                                        try {
+                                            await window.app.initWithFirestore(user.uid);
+                                        } catch (initErr) {
+                                            console.error('Fallback initWithFirestore failed:', initErr);
+                                        }
+                                    }
+
+                                    // Ensure at least a render run
+                                    try {
+                                        if (typeof window.app.renderCurrentView === 'function') {
+                                            window.app.renderCurrentView();
+                                        } else if (typeof window.app.render === 'function') {
+                                            window.app.render();
+                                        }
+                                    } catch (renderErr) {
+                                        console.warn('Render during auth fallback failed:', renderErr);
+                                    }
+                                }
+                            } catch (fallbackErr) {
+                                console.warn('Auth fallback logic error:', fallbackErr);
                             }
                         } else {
                             console.log('🔓 Firebase auth state: signed out');
