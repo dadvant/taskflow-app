@@ -851,7 +851,7 @@
             <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
                 <div style="display:flex; align-items:center; gap:12px;">
                     <!-- Inline SVG toggle for Shopping list (click toggles list on/off) -->
-                    <button id="shoppingToggleBtn" type="button" title="Toggle shopping list" style="background:none;border:none;padding:6px;cursor:pointer;font-size:18px;display:flex;align-items:center;gap:8px;">
+                    <button id="shoppingToggleBtn" type="button" title="Toggle shopping list" style="background:none;border:none;padding:6px;cursor:pointer;font-size:18px;display:flex;align-items:center;gap:8px;color:var(--secondary-color);">
                         <svg id="shoppingToggleSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" stroke="none">
                             <path d="M3 3h2l2.68 11.39a2 2 0 0 0 2 1.61h7.72a2 2 0 0 0 2-1.61L23 6H6z" />
                             <circle cx="10" cy="20.5" r="1.25" />
@@ -9181,15 +9181,30 @@ Complete this task and stay productive!`;
         // Populate shopping list editor (top) if this task is a shopping list
         const isShoppingEl = document.getElementById('isShoppingList');
         const topEditorTbody = document.querySelector('#topShoppingItemsTable tbody');
-        if (isShoppingEl && topEditorTbody) {
+                if (isShoppingEl && topEditorTbody) {
             // Clear existing rows
             topEditorTbody.innerHTML = '';
             if (task.isShoppingList && Array.isArray(task.items)) {
                 isShoppingEl.checked = true;
                 // Populate only the top editor
-                task.items.forEach(item => {
-                    this._shoppingAddTopRow(item);
-                });
+                        // Use internal helper if available, otherwise create rows directly
+                        const addTopRowFn = this._shoppingAddTopRow || function(item) {
+                            try {
+                                const tb = document.querySelector('#topShoppingItemsTable tbody');
+                                if (!tb) return;
+                                const tr = document.createElement('tr');
+                                tr.innerHTML = `
+                                    <td style="padding:6px;"><input type="text" class="item-name" value="${String(item.name||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" style="width:100%"></td>
+                                    <td style="padding:6px;"><input type="text" class="item-qty" value="${String(item.qty||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" style="width:80px"></td>
+                                    <td style="padding:6px;"><input type="text" class="item-comments" value="${String(item.comments||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" style="width:100%"></td>
+                                    <td style="padding:6px; text-align:center;"><button type="button" class="btn btn--danger btn--small remove-row">✕</button></td>
+                                `;
+                                tb.appendChild(tr);
+                                tr.querySelector('.remove-row')?.addEventListener('click', () => tr.remove());
+                            } catch (err) { console.warn('Failed to add top row fallback:', err); }
+                        };
+
+                        task.items.forEach(item => addTopRowFn(item));
                 // Show top editor by default when editing a shopping list
                 const topEditorEl = document.getElementById('topShoppingEditor');
                 const descEl2 = document.getElementById('taskDescription');
