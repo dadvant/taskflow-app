@@ -9255,6 +9255,17 @@ Complete this task and stay productive!`;
                     </span>
                 </div>
             ` : ''}
+            
+            ${task.isShoppingList ? `
+                <div class="task-detail-row">
+                    <span class="task-detail-label">Shopping List Items:</span>
+                    <span class="task-detail-value">
+                        <ul style="margin:6px 0 0 18px; padding:0;">
+                            ${Array.isArray(task.items) && task.items.length > 0 ? task.items.map(it => `<li style="margin-bottom:6px;">${this.escapeHtml(it.qty || '')} ${this.escapeHtml(it.name)} ${it.comments ? '<span style="color:var(--text-secondary); font-size:12px;"> — ' + this.escapeHtml(it.comments) + '</span>' : ''}</li>`).join('') : '<li style="color:var(--text-secondary);">No items added</li>'}
+                        </ul>
+                    </span>
+                </div>
+            ` : ''}
         `;
         
         document.getElementById('expandedTaskBody').innerHTML = bodyHtml;
@@ -9483,6 +9494,20 @@ Complete this task and stay productive!`;
         if (isShoppingEl) {
             isShoppingEl.addEventListener('change', (e) => {
                 if (editor) editor.style.display = isShoppingEl.checked ? 'block' : 'none';
+                // If the editor was just enabled and has no rows, add a starter row
+                try {
+                    const tbodyEl = document.querySelector('#shoppingItemsTable tbody');
+                    if (isShoppingEl.checked && tbodyEl && tbodyEl.children.length === 0) {
+                        this._shoppingAddRow({ name: '', qty: '', comments: '' });
+                        // focus the first input for quick entry
+                        setTimeout(() => {
+                            const first = tbodyEl.querySelector('.item-name');
+                            if (first) try { first.focus(); } catch (_) {}
+                        }, 50);
+                    }
+                } catch (err) {
+                    console.warn('Could not auto-add shopping row:', err);
+                }
             });
         }
 
