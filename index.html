@@ -6168,6 +6168,12 @@ Calendar event will be created separately.`);
 
         this.initializeTheme();
         this.initializeEventListeners();
+        // Initialize shopping list editor UI (if present)
+        try {
+            this.initializeShoppingListEditor();
+        } catch (e) {
+            console.warn('Shopping list editor not available yet or initialization failed:', e);
+        }
         this.generateMiniCalendar();
         this.updateTaskCounts();
         this.updateStats();
@@ -6709,7 +6715,7 @@ Calendar event will be created separately.`);
         const autoCalendarEnabled = document.getElementById('autoCreateEvents')?.checked ?? true;
         
         // Simple logic: If auto-create is enabled and task has a due date, create calendar event
-        if (autoCalendarEnabled && task.dueDate) {
+    if (!task.isShoppingList && autoCalendarEnabled && task.dueDate) {
             console.log('📅 Auto-creating calendar event for:', task.title);
             
             setTimeout(() => {
@@ -6752,8 +6758,13 @@ Calendar event will be created separately.`);
         const aiRecommendsReminder = this.shouldCreateCalendarReminder(task);
         console.log('🤖 AI recommends calendar reminder:', aiRecommendsReminder);
         
-        // Final decision
-        const shouldCreateEvent = manualCalendarRequested || aiRecommendsReminder;
+        // Final decision - do not create calendar events for shopping lists
+        let shouldCreateEvent = false;
+        if (!task.isShoppingList) {
+            shouldCreateEvent = manualCalendarRequested || aiRecommendsReminder;
+        } else {
+            console.log('⏭️ Skipping calendar creation because this is a shopping list');
+        }
         console.log('🎯 Final decision - Create calendar event:', shouldCreateEvent);
         
         if (shouldCreateEvent) {
@@ -7011,7 +7022,7 @@ Calendar event will be created separately.`);
         const timeEl = document.getElementById('taskTime');
         const recurrenceEl = document.getElementById('taskRecurrence');
 
-        return {
+        const base = {
             title: titleEl ? titleEl.value.trim() : '',
             description: descEl ? descEl.value.trim() : '',
             priority: this.getSelectedPriority(),
@@ -7021,6 +7032,19 @@ Calendar event will be created separately.`);
             dueTime: timeEl ? timeEl.value : '',
             recurrence: recurrenceEl ? recurrenceEl.value : 'none'
         };
+
+        // Include shopping list metadata if the checkbox is present
+        const isShoppingEl = document.getElementById('isShoppingList');
+        if (isShoppingEl && isShoppingEl.checked) {
+            base.isShoppingList = true;
+            base.items = this._serializeShoppingItems();
+            // Ensure tags include list/grocery for filtering
+            base.tags = Array.from(new Set([...(base.tags || []), 'list', 'grocery']));
+        } else {
+            base.isShoppingList = false;
+        }
+
+        return base;
     }
 
     // Keep all existing functionality methods...
@@ -9033,6 +9057,20 @@ Complete this task and stay productive!`;
         
         // Set calendar event checkbox
         document.getElementById('createCalendarEvent').checked = !!task.calendarEvent;
+
+        // Populate shopping list editor if this task is a shopping list
+        const isShoppingEl = document.getElementById('isShoppingList');
+        const editorTbody = document.querySelector('#shoppingItemsTable tbody');
+        if (isShoppingEl && editorTbody) {
+            // Clear existing rows
+            editorTbody.innerHTML = '';
+            if (task.isShoppingList && Array.isArray(task.items)) {
+                isShoppingEl.checked = true;
+                task.items.forEach(item => this._shoppingAddRow(item));
+            } else {
+                isShoppingEl.checked = false;
+            }
+        }
 
         // Change modal title and button
         document.querySelector('#addTaskModal .modal-header h2').textContent = 'Edit Task';
