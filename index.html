@@ -201,11 +201,22 @@
                 try {
                     const calendarConnected = window.app?.calendarConnected || false;
                     if (!calendarConnected) {
-                        const connect = await showConfirm('Connect Google Calendar', 'Would you like to connect your Google Calendar now? This will use the same Google account for calendar access.');
-                        if (connect) {
-                            // Trigger existing handler which signs in with Google and saves token
-                            await handleGoogleSignIn();
-                        }
+                            // Use showConfirm with an onConfirm callback so the OAuth popup is opened
+                            // directly from a user click handler (avoids popup-blocked errors).
+                            await showConfirm(
+                                'Connect Google Calendar',
+                                'Would you like to connect your Google Calendar now? This will use the same Google account for calendar access.',
+                                // onConfirm callback: called synchronously inside the OK click handler
+                                () => {
+                                    try {
+                                        // Do not await here so the call happens inside the click handler
+                                        // which browsers treat as a direct user gesture.
+                                        handleGoogleSignIn();
+                                    } catch (e) {
+                                        console.error('Error triggering Google sign-in from confirm callback:', e);
+                                    }
+                                }
+                            );
                     }
                 } catch (e) {
                     console.error('Error during Google Calendar auto-connect prompt:', e);
@@ -612,6 +623,10 @@
                 <button class="btn btn--secondary" id="filterBtn">
                     <i class="fas fa-filter"></i>
                     Filter
+                </button>
+                <!-- Compact view toggle -->
+                <button class="btn btn--tertiary" id="compactToggle" title="Compact view: show more tasks">
+                    <i class="fas fa-compress-alt"></i>
                 </button>
                 <button class="btn btn--primary" id="addTaskBtn">
                     <i class="fas fa-plus"></i>
@@ -1629,19 +1644,32 @@
         }
 
         /* Quadrant styling - EXACT v2.13 */
-        .matrix-quadrant {
+          .matrix-quadrant {
             flex: 1;
             min-width: 300px;
-            height: 400px;
+                /* Let quadrants expand visually but never exceed viewport height.
+                    Use a tighter subtraction so more vertical space is available for tasks. */
+                max-height: calc(100vh - 104px);
+            height: auto;
             display: flex;
             flex-direction: column;
+            /* Allow internal scrolling for task lists while keeping header/actions fixed inside the quadrant */
             overflow: hidden;
             background: var(--bg-primary);
             border-radius: 12px;
             margin: 8px;
             padding: 20px;
             box-shadow: var(--shadow);
-            min-height: 400px;
+            min-height: 260px;
+        }
+
+        /* Make the tasks container inside each quadrant scrollable when content exceeds available space */
+        .matrix-quadrant .quadrant-tasks,
+        .matrix-quadrant .tasks-list,
+        .matrix-quadrant .matrix-task-list {
+            overflow-y: auto;
+            /* Use the remaining height of the quadrant: subtract header/title area */
+            max-height: calc(100% - 60px);
         }
 
         /* No additional dark theme needed - uses CSS variables */
@@ -1976,11 +2004,13 @@
         /* Matrix tasks (inside quadrants) - use bg-secondary for contrast */
         .quadrant-tasks .task-item {
             background: var(--bg-secondary);
-            padding: 12px;
-            margin-bottom: 8px;
+            padding: 8px 10px; /* slightly smaller padding */
+            margin-bottom: 6px; /* reduce spacing between items */
             border-radius: 8px;
             border-left: none;
             box-shadow: none;
+            font-size: 13px; /* slightly smaller font for denser lists */
+            line-height: 1.2;
         }
 
         .quadrant-tasks .task-item:hover {
@@ -2239,6 +2269,33 @@
             background: var(--primary-hover);
         }
 
+        /* Tertiary button used for compact toggle */
+        .btn--tertiary {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 10px;
+            border-radius: 6px;
+            margin-right: 6px;
+        }
+
+        .btn--tertiary:hover {
+            background: var(--bg-secondary);
+        }
+
+        /* Compact view: denser list styling */
+        body.compact-view .quadrant-tasks .task-item {
+            padding: 6px 8px !important;
+            margin-bottom: 4px !important;
+            font-size: 12px !important;
+        }
+
+        body.compact-view .task-priority, body.compact-view .task-date, body.compact-view .task-tags {
+            font-size: 11px !important;
+        }
+
+        body.compact-view .matrix-task-meta { gap: 4px !important; }
+
         /* Keep original side-by-side layout for 5 quadrants */
         .priority-matrix {
             display: flex;
@@ -2246,10 +2303,32 @@
             gap: 20px;
         }
 
+        /* Ensure main content uses the remaining viewport height under the header
+           and let the task views (including the priority matrix) expand and scroll internally.
+           This does not change the header styles; it only controls available space below it. */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            /* Allow main content to fill remaining viewport height */
+            max-height: calc(100vh - 80px); /* adjust 80px if your header is taller */
+            overflow: hidden;
+        }
+
+        .task-views {
+            /* Let the task-views area take up the remaining space inside main-content and scroll if needed */
+            flex: 1 1 auto;
+            min-height: 0; /* important for flex children to allow proper scrolling */
+            overflow: auto;
+        }
+
         .quadrant-tasks {
-            flex: 1;
+            /* Use available space inside the quadrant and allow internal scrolling */
+            flex: 1 1 auto;
+            height: auto;
             overflow-y: auto;
             padding: 8px 0;
+            /* Ensure it doesn't grow past the quadrant's scrollable area */
+            max-height: calc(100% - 40px);
         }
 
         /* Matrix Task Actions */
@@ -4344,6 +4423,17 @@ class TaskFlowEnhanced {
             console.log('🧪 Testing restored Google Calendar connection...');
             
             // Try to get calendar list to verify connection
+            // Ensure Calendar API is loaded before making calls
+            if (!gapi.client.calendar) {
+                try {
+                    console.log('ℹ️ Calendar API not loaded on restore, loading now...');
+                    await gapi.client.load('calendar', 'v3');
+                    console.log('✅ Calendar API loaded during restore');
+                } catch (loadErr) {
+                    console.warn('⚠️ Failed to load Calendar API during restore:', loadErr);
+                }
+            }
+
             const response = await gapi.client.calendar.calendarList.list({
                 maxResults: 1
             });
@@ -6479,6 +6569,22 @@ Calendar event will be created separately.`);
                 updatedAt: new Date().toISOString()
             };
 
+            // If user explicitly wrote the word "delegate" in the title, move it to tags
+            const explicitDelegateRegex = /\bdelegate\b/i;
+            if (explicitDelegateRegex.test(this.tasks[taskIndex].title)) {
+                // Remove the word from the title
+                this.tasks[taskIndex].title = this.tasks[taskIndex].title.replace(explicitDelegateRegex, '').trim();
+
+                // Ensure tags array exists and add 'delegate' tag if not present
+                this.tasks[taskIndex].tags = this.tasks[taskIndex].tags || [];
+                if (!this.tasks[taskIndex].tags.map(t => t.toLowerCase()).includes('delegate')) {
+                    this.tasks[taskIndex].tags.push('delegate');
+                }
+
+                // Mark explicit delegate flag for rendering logic
+                this.tasks[taskIndex].explicitDelegate = true;
+            }
+
             console.log('📝 Task updated:', this.tasks[taskIndex]);
             
             // 📅 UPDATE CALENDAR EVENT IF IT EXISTS
@@ -6554,6 +6660,17 @@ Calendar event will be created separately.`);
         };
 
         console.log('📝 Task created:', task);
+
+        // If user explicitly wrote 'delegate' in the title, move it to tags and strip it from title
+        const explicitDelegateRegex = /\bdelegate\b/i;
+        if (explicitDelegateRegex.test(task.title)) {
+            task.title = task.title.replace(explicitDelegateRegex, '').trim();
+            task.tags = task.tags || [];
+            if (!task.tags.map(t => t.toLowerCase()).includes('delegate')) {
+                task.tags.push('delegate');
+            }
+            task.explicitDelegate = true;
+        }
 
         // Handle recurring tasks
         if (formData.recurrence && formData.recurrence !== 'none') {
@@ -7390,14 +7507,22 @@ Calendar event will be created separately.`);
         const filteredTasks = this.filterTasks(activeTasks);
         
         filteredTasks.forEach(task => {
-            // Smart delegate detection for grocery/shopping tasks
-            if (this.isDelegateTask(task)) {
-                quadrants['immediate-not-important'].push(task);
+            // Determine priority key and whether the user explicitly marked this task as delegate
+            const key = this.getPriorityKey(task.priority);
+            const isExplicitDelegate = task.explicitDelegate || (task.tags && task.tags.map(t => t.toLowerCase()).includes('delegate'));
+
+            // If the task's priority maps to the delegate quadrant, only place it there when explicitly marked.
+            if (key === 'immediate-not-important') {
+                if (isExplicitDelegate) {
+                    quadrants['immediate-not-important'].push(task);
+                } else {
+                    // If not explicitly delegated, treat it as not-important-not-immediate by default
+                    quadrants['not-important-not-immediate'].push(task);
+                }
                 return;
             }
-            
-            // Use the EXACT working logic from v2.13
-            const key = this.getPriorityKey(task.priority);
+
+            // Default behavior for other quadrants
             console.log('Task:', task.title, 'Priority key:', key);
             if (quadrants[key]) {
                 quadrants[key].push(task);
@@ -7476,15 +7601,20 @@ Calendar event will be created separately.`);
         });
     }
 
-    // Smart delegate task detection
+    // Delegate detection: prefer explicit marking via tag or explicitDelegate flag.
+    // Keep a non-invasive smart detection that returns true only for common shopping/grocery phrasing.
     isDelegateTask(task) {
+        // If explicitly marked via flag or tag, it's a delegate
+        if (task.explicitDelegate) return true;
+        if (task.tags && task.tags.map(t => t.toLowerCase()).includes('delegate')) return true;
+
+        // Lightweight detection for grocery/shopping-related tasks
         const delegateKeywords = [
             'grocery', 'groceries', 'shopping', 'shop', 'buy', 'purchase',
             'pick up', 'pickup', 'get from store', 'store', 'market',
-            'milk', 'bread', 'eggs', 'food', 'dinner', 'lunch',
-            'delegate', 'assign', 'share', 'send to', 'ask someone'
+            'milk', 'bread', 'eggs', 'food', 'dinner', 'lunch'
         ];
-        
+
         const taskText = (task.title + ' ' + (task.description || '')).toLowerCase();
         return delegateKeywords.some(keyword => taskText.includes(keyword));
     }
@@ -7493,10 +7623,13 @@ Calendar event will be created separately.`);
     emailDelegateTasks() {
         const delegateTasks = this.tasks.filter(task => {
             if (task.completed) return false;
-            
-            // Check if priority is "immediate-not-important" (delegate quadrant)
+
             const priorityString = this.convertPriorityToString(task.priority);
-            return priorityString === 'immediate-not-important' || this.isDelegateTask(task);
+            const isExplicitDelegate = task.explicitDelegate || (task.tags && task.tags.map(t => t.toLowerCase()).includes('delegate'));
+
+            // Include explicit delegates, and also include tasks detected by the lightweight smart detection
+            if (isExplicitDelegate) return true;
+            return this.isDelegateTask(task);
         });
         
         if (delegateTasks.length === 0) {
@@ -9228,12 +9361,57 @@ window.addEventListener('load', () => {
         }
     }, 3000); // Wait for all Google APIs to load
 });
+
+// Compact view toggle wiring
+(function() {
+    function applyCompactState(enabled) {
+        if (enabled) document.body.classList.add('compact-view');
+        else document.body.classList.remove('compact-view');
+    }
+
+    const btn = document.getElementById('compactToggle');
+    if (btn) {
+        // Initialize from localStorage
+        const saved = localStorage.getItem('taskflow_compact_view');
+        const enabled = saved === '1';
+        applyCompactState(enabled);
+
+        btn.addEventListener('click', () => {
+            const currently = document.body.classList.contains('compact-view');
+            const next = !currently;
+            applyCompactState(next);
+            localStorage.setItem('taskflow_compact_view', next ? '1' : '0');
+            // toggle icon for visual feedback
+            btn.querySelector('i')?.classList.toggle('fa-compress-alt', next);
+            btn.querySelector('i')?.classList.toggle('fa-expand-alt', !next);
+        });
+
+        // Set initial icon state
+        const icon = btn.querySelector('i');
+        if (icon) {
+            const isCompact = document.body.classList.contains('compact-view');
+            icon.classList.remove('fa-expand-alt', 'fa-compress-alt');
+            icon.classList.add(isCompact ? 'fa-expand-alt' : 'fa-compress-alt');
+        }
+    }
+})();
     </script>
 
     <script>
         // Register service worker for PWA
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
+            // Check that the service worker file exists before attempting to register.
+            fetch('sw.js', {method: 'HEAD'}).then(resp => {
+                if (resp.ok) {
+                    navigator.serviceWorker.register('sw.js').catch(err => {
+                        console.warn('Service worker registration failed:', err);
+                    });
+                } else {
+                    console.info('Service worker file not found (skipping registration)');
+                }
+            }).catch(err => {
+                console.info('Could not verify service worker file (skipping):', err);
+            });
         }
     </script>
     
@@ -9262,7 +9440,10 @@ window.addEventListener('load', () => {
         }
 
         // Reusable confirm modal that returns a Promise<boolean>
-        function showConfirm(title, message) {
+        // showConfirm now accepts an optional onConfirm callback which will be invoked
+        // synchronously inside the OK click handler. This lets callers open OAuth popups
+        // inside the user's click gesture to avoid browser popup blockers.
+        function showConfirm(title, message, onConfirm) {
             return new Promise((resolve) => {
                 const modal = document.getElementById('confirmModal');
                 const msg = document.getElementById('confirmModalMessage');
@@ -9281,7 +9462,20 @@ window.addEventListener('load', () => {
                     resolve(result);
                 }
 
-                function onOk() { cleanup(true); }
+                function onOk() {
+                    // If an onConfirm callback was provided, call it here inside the
+                    // actual click handler so the browser treats any popup it opens
+                    // as a direct result of a user gesture.
+                    try {
+                        if (typeof onConfirm === 'function') {
+                            onConfirm();
+                        }
+                    } catch (cbErr) {
+                        console.error('Error in confirm onConfirm callback:', cbErr);
+                    }
+                    cleanup(true);
+                }
+
                 function onCancel() { cleanup(false); }
 
                 ok.addEventListener('click', onOk);
