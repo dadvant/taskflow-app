@@ -9208,18 +9208,19 @@ Complete this task and stay productive!`;
             topEditorTbody.innerHTML = '';
             if (task.isShoppingList && Array.isArray(task.items)) {
                 isShoppingEl.checked = true;
-                // Populate both editors so user sees the same content regardless of which they edit
+                // Populate only the top editor to avoid duplicate tables
                 task.items.forEach(item => {
-                    this._shoppingAddRow(item);
                     this._shoppingAddTopRow(item);
                 });
-                // Show top editor by default when editing a shopping list
+                // Show top editor by default when editing a shopping list and hide bottom editor
                 const topEditorEl = document.getElementById('topShoppingEditor');
+                const bottomEditorEl = document.getElementById('shoppingListEditor');
                 const descEl2 = document.getElementById('taskDescription');
                 if (topEditorEl && descEl2) {
                     topEditorEl.style.display = 'block';
                     descEl2.style.display = 'none';
                 }
+                if (bottomEditorEl) bottomEditorEl.style.display = 'none';
             } else {
                 isShoppingEl.checked = false;
             }
@@ -9609,8 +9610,20 @@ Complete this task and stay productive!`;
         }
 
         if (addRowBtn) {
+            // Route bottom 'Add row' to top editor to avoid duplicating tables
             addRowBtn.addEventListener('click', (e) => {
-                this._shoppingAddRow({ name: '', qty: '', comments: '' });
+                if (this._shoppingAddTopRow) {
+                    this._shoppingAddTopRow({ name: '', qty: '', comments: '' });
+                    // Ensure top editor is visible and bottom hidden
+                    const topEditorEl = document.getElementById('topShoppingEditor');
+                    const bottomEditorEl = document.getElementById('shoppingListEditor');
+                    const descEl = document.getElementById('taskDescription');
+                    if (topEditorEl) topEditorEl.style.display = 'block';
+                    if (bottomEditorEl) bottomEditorEl.style.display = 'none';
+                    if (descEl) descEl.style.display = 'none';
+                } else {
+                    this._shoppingAddRow({ name: '', qty: '', comments: '' });
+                }
             });
         }
 
