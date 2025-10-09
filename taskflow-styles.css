@@ -1444,3 +1444,16 @@ body {
     background: linear-gradient(45deg, rgba(90, 154, 253, 0.15), rgba(95, 191, 71, 0.15));
     border-color: rgba(90, 154, 253, 0.3);
 }
+
+/* Shopping toggle button: use secondary color on light theme, but text color on dark theme for contrast */
+#shoppingToggleBtn {
+    color: var(--secondary-color);
+}
+
+[data-theme="dark"] #shoppingToggleBtn {
+    color: var(--text-primary);
+}
+
+#shoppingToggleBtn svg {
+    fill: currentColor;
+}
