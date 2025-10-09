@@ -74,47 +74,17 @@
             db = getFirestore(app);
             console.log('🔥 Firebase initialized successfully!');
             window.firebaseReady = true;
-        } catch (error) {
-            console.error('❌ Firebase initialization error:', error);
-            console.log('⚠️ Running in offline mode. Please configure Firebase to enable cloud sync.');
-            window.firebaseReady = false;
-        }
 
-        // ============================================================================
-        // FIREBASE AUTH & DATA MANAGER
-        // ============================================================================
-        
+        // Expose Firebase helper methods as a single manager object
         window.FirebaseManager = {
-            currentUser: null,
-            dataUnsubscribe: null,
-            
-            // Initialize auth listener
-            init() {
-                if (!window.firebaseReady) {
-                    console.log('Firebase not configured, skipping auth');
-                    return;
-                }
-                
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        this.currentUser = user;
-                        console.log('✅ User logged in:', user.email);
-                        this.onLogin(user);
-                    } else {
-                        this.currentUser = null;
-                        console.log('❌ User logged out');
-                        this.onLogout();
-                    }
-                });
-            },
-            
-            // Sign in with Google
+            // Sign in with Google (returns Firebase user)
             async signInWithGoogle() {
+                const provider = new GoogleAuthProvider();
+                // Request calendar scopes for calendar integration
+                provider.addScope('https://www.googleapis.com/auth/calendar.events');
+                provider.setCustomParameters({ prompt: 'consent' });
+
                 try {
-                    const provider = new GoogleAuthProvider();
-                    // Add Calendar scope for automatic token management
-                    provider.addScope('https://www.googleapis.com/auth/calendar');
-                    provider.addScope('https://www.googleapis.com/auth/calendar.events');
                     const result = await signInWithPopup(auth, provider);
                     
                     // Save Google OAuth access token for Calendar API
@@ -351,10 +321,16 @@
 
         // Initialize on load
         if (window.firebaseReady) {
-            window.FirebaseManager.init();
+            if (window.FirebaseManager.init) {
+                window.FirebaseManager.init();
+            }
         }
-        
+
         console.log('✅ Firebase module loaded');
+    } catch (err) {
+        console.error('❌ Firebase initialization failed', err);
+        window.firebaseReady = false;
+    }
     </script>
     
     <script src="https://apis.google.com/js/api.js"></script>
@@ -961,6 +937,30 @@
                                     Add meeting link
                                 </label>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Shopping / Grocery List -->
+                    <div class="form-group">
+                        <label for="isShoppingList">
+                            <input type="checkbox" id="isShoppingList"> This is a Shopping / Grocery list
+                        </label>
+                        <div id="shoppingListEditor" style="display:none; margin-top: 12px;">
+                            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                                <strong>Items</strong>
+                                <button type="button" class="btn btn--secondary btn--small" id="addItemRowBtn">Add row</button>
+                            </div>
+                            <table id="shoppingItemsTable" style="width:100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align:left; padding:6px; width:50%;">Name</th>
+                                        <th style="text-align:left; padding:6px; width:15%;">Qty</th>
+                                        <th style="text-align:left; padding:6px;">Comments</th>
+                                        <th style="width:40px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
                         </div>
                     </div>
                 </form>
@@ -7748,6 +7748,8 @@ TaskFlow`;
 
         const tagColors = ['#f59e0b', '#ef4444', '#dc2626', '#f97316', '#0891b2', '#059669', '#8b5cf6', '#06b6d4'];
         const usedColors = this.tags.map(t => t.color);
+
+    
         const availableColors = tagColors.filter(c => !usedColors.includes(c));
         const tagColor = availableColors.length > 0 ? availableColors[0] : tagColors[Math.floor(Math.random() * tagColors.length)];
 
@@ -9337,6 +9339,52 @@ Complete this task and stay productive!`;
         });
     }
 
+    // Shopping list helper functions
+    initializeShoppingListEditor() {
+        const isShoppingEl = document.getElementById('isShoppingList');
+        const editor = document.getElementById('shoppingListEditor');
+        const addRowBtn = document.getElementById('addItemRowBtn');
+        const tbody = document.querySelector('#shoppingItemsTable tbody');
+
+        const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        function addRow(item = { name: '', qty: '', comments: '' }) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding:6px;"><input type="text" class="item-name" value="${escapeHtml(item.name)}" style="width:100%"></td>
+                <td style="padding:6px;"><input type="text" class="item-qty" value="${escapeHtml(item.qty)}" style="width:80px"></td>
+                <td style="padding:6px;"><input type="text" class="item-comments" value="${escapeHtml(item.comments)}" style="width:100%"></td>
+                <td style="padding:6px; text-align:center;"><button type="button" class="btn btn--danger btn--small remove-row">✕</button></td>
+            `;
+            tbody.appendChild(tr);
+            tr.querySelector('.remove-row').addEventListener('click', () => tr.remove());
+        }
+
+        // expose addRow in instance for use when populating
+        this._shoppingAddRow = addRow.bind(this);
+
+        if (isShoppingEl) {
+            isShoppingEl.addEventListener('change', (e) => {
+                if (editor) editor.style.display = isShoppingEl.checked ? 'block' : 'none';
+            });
+        }
+
+        if (addRowBtn) {
+            addRowBtn.addEventListener('click', (e) => {
+                this._shoppingAddRow({ name: '', qty: '', comments: '' });
+            });
+        }
+    }
+
+    // When saving a task, serialize shopping list rows into task.items
+    _serializeShoppingItems() {
+        const rows = Array.from(document.querySelectorAll('#shoppingItemsTable tbody tr'));
+        return rows.map(r => ({
+            name: r.querySelector('.item-name')?.value || '',
+            qty: r.querySelector('.item-qty')?.value || '',
+            comments: r.querySelector('.item-comments')?.value || ''
+        })).filter(i => i.name.trim());
+    }
     // Override hideAddTaskModal to reset form
     hideAddTaskModal() {
         const modal = document.getElementById('addTaskModal');
