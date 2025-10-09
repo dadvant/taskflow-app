@@ -17,6 +17,8 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4285f4">
+    <!-- Runtime-visible app version (updated by scripts/update-version.ps1) -->
+    <meta name="taskflow-version" content="3.0-c093e9b">
     <link rel="icon" href="assets/icons/taskflow-192.svg" sizes="192x192" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/icons/taskflow-192.svg">
     
@@ -8787,12 +8789,13 @@ Complete this task and stay productive!`;
     exportData(format) {
         console.log(`📤 Exporting data as ${format.toUpperCase()}`);
 
+        const runtimeVersion = window.APP_VERSION || document.querySelector('meta[name="taskflow-version"]')?.getAttribute('content') || '3.0-unknown';
         const data = {
             tasks: this.tasks,
             projects: this.projects,
             settings: this.settings,
             exportedAt: new Date().toISOString(),
-            version: '3.0-54579be'
+            version: runtimeVersion
         };
 
         let content, filename, mimeType;
