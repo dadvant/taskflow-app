@@ -12,7 +12,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TaskFlow v3.0 (ef2122a) - Cloud Sync</title>
+    <title>TaskFlow v3.0 (851936c) - Cloud Sync</title>
     <link rel="stylesheet" href="taskflow-styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
@@ -424,7 +424,7 @@
             <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
                 <h2 style="margin: 0; display: flex; align-items: center; gap: 10px;">
                     <i class="fas fa-tasks" style="color: var(--primary-color);"></i>
-                    Welcome to TaskFlow v3.0 (ef2122a)
+                    Welcome to TaskFlow v3.0 (851936c)
                 </h2>
             </div>
             <div class="modal-body" style="padding: 30px 24px;">
@@ -528,7 +528,7 @@
         </button>
         <div class="logo">
             <i class="fas fa-tasks"></i>
-            <span>TaskFlow v3.0 (ef2122a)</span>
+            <span>TaskFlow v3.0 (851936c)</span>
         </div>
         <div class="header-actions">
             <!-- User Profile -->
@@ -560,7 +560,7 @@
         <div class="sidebar-header">
             <div class="logo">
                 <i class="fas fa-tasks"></i>
-                <span>TaskFlow v3.0 (ef2122a)</span>
+                <span>TaskFlow v3.0 (851936c)</span>
             </div>
             <button class="close-sidebar" id="closeSidebar">
                 <i class="fas fa-times"></i>
@@ -888,17 +888,19 @@
                                 <button type="button" class="btn btn--secondary btn--small" id="topAddItemRowBtn">Add row</button>
                                 <button type="button" class="btn btn--tertiary btn--small" id="toggleTopEditorMode" title="Toggle table/textarea">Switch to textarea</button>
                             </div>
-                            <table id="topShoppingItemsTable" style="width:100%; border-collapse: collapse;">
-                                <thead>
-                                    <tr>
-                                        <th style="text-align:left; padding:6px; width:50%;">Name</th>
-                                        <th style="text-align:left; padding:6px; width:15%;">Qty</th>
-                                        <th style="text-align:left; padding:6px;">Comments</th>
-                                        <th style="width:40px;"></th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
+                            <div id="topShoppingEditor" style="display:block;">
+                                <table id="topShoppingItemsTable" style="width:100%; border-collapse: collapse;">
+                                    <thead>
+                                        <tr>
+                                            <th style="text-align:left; padding:6px; width:50%;">Name</th>
+                                            <th style="text-align:left; padding:6px; width:15%;">Qty</th>
+                                            <th style="text-align:left; padding:6px;">Comments</th>
+                                            <th style="width:40px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
 
                     <!-- Priority Selection - FIXED WIDTH -->
                     <div class="form-group">
@@ -7121,11 +7123,18 @@ Calendar event will be created separately.`);
             recurrence: recurrenceEl ? recurrenceEl.value : 'none'
         };
 
-        // Include shopping list metadata if the checkbox is present
+        // Include shopping list metadata if the checkbox is present OR
+        // if the top shopping editor contains rows (users may use the table without
+        // interacting with the hidden checkbox). This makes the feature more robust.
         const isShoppingEl = document.getElementById('isShoppingList');
-        if (isShoppingEl && isShoppingEl.checked) {
+        const topTbody = document.querySelector('#topShoppingItemsTable tbody');
+        const topHasRows = topTbody && topTbody.querySelector('tr');
+
+        if ((isShoppingEl && isShoppingEl.checked) || topHasRows) {
             base.isShoppingList = true;
             base.items = this._serializeShoppingItems();
+            // DEBUG: log serialized items so developer/user can inspect in browser console
+            try { console.log('DEBUG: getTaskFormData serialized items ->', base.items); } catch (e) {}
             // Ensure tags include list/grocery for filtering
             base.tags = Array.from(new Set([...(base.tags || []), 'list', 'grocery']));
         } else {
@@ -7496,7 +7505,7 @@ Calendar event will be created separately.`);
 
                         ${task.tags && task.tags.length > 0 ? `
                             <div class="task-tags">
-                                ${task.tags.map(tag => `<span class="task-tag">${this.escapeHtml(tag)}</span>`).join('')}
+                                ${task.tags.map(tag => `<span class="task-tag">${this.renderTagHtml(tag)}</span>`).join('')}
                             </div>
                         ` : ''}
 
@@ -7593,7 +7602,7 @@ Calendar event will be created separately.`);
 
                     ${task.tags && task.tags.length > 0 ? `
                         <div class="task-tags">
-                            ${task.tags.map(tag => `<span class="task-tag">${this.escapeHtml(tag)}</span>`).join('')}
+                            ${task.tags.map(tag => `<span class="task-tag">${this.renderTagHtml(tag)}</span>`).join('')}
                         </div>
                     ` : ''}
 
@@ -8742,7 +8751,7 @@ Complete this task and stay productive!`;
             projects: this.projects,
             settings: this.settings,
             exportedAt: new Date().toISOString(),
-            version: '3.0-ef2122a'
+            version: '3.0-851936c'
         };
 
         let content, filename, mimeType;
@@ -8927,6 +8936,19 @@ Complete this task and stay productive!`;
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // Render tag HTML with small enhancements for 'list' and 'grocery'
+    renderTagHtml(tag) {
+        const t = String(tag || '').toLowerCase();
+        if (t === 'list') {
+            return 'List.'; // show as 'List.' exactly as requested
+        }
+        if (t === 'grocery' || t === 'shopping') {
+            // return a small shopping cart icon + capitalized tag
+            return `<i class="fas fa-shopping-cart" style="margin-right:6px;"></i>${this.escapeHtml(tag)} `;
+        }
+        return this.escapeHtml(tag);
     }
 
     showNotification(message, type = 'info') {
@@ -9205,6 +9227,7 @@ Complete this task and stay productive!`;
                         };
 
                         task.items.forEach(item => addTopRowFn(item));
+                        try { console.log('DEBUG: editTask populating top editor with items ->', task.items); } catch (e) {}
                 // Show top editor by default when editing a shopping list
                 const topEditorEl = document.getElementById('topShoppingEditor');
                 const descEl2 = document.getElementById('taskDescription');
@@ -9270,7 +9293,7 @@ Complete this task and stay productive!`;
                     <span class="task-detail-label">Tags:</span>
                     <span class="task-detail-value">
                         <div class="task-tags">
-                            ${task.tags.map(tag => `<span class="task-tag">${this.escapeHtml(tag)}</span>`).join('')}
+                            ${task.tags.map(tag => `<span class="task-tag">${this.renderTagHtml(tag)}</span>`).join('')}
                         </div>
                     </span>
                 </div>
@@ -9642,17 +9665,22 @@ Complete this task and stay productive!`;
 
     // When saving a task, serialize shopping list rows into task.items
     _serializeShoppingItems() {
-        // Prefer top editor if visible (users working in Add modal top table)
-        const topEl = document.getElementById('topShoppingEditor');
-        const rows = topEl && topEl.style.display && topEl.style.display !== 'none'
-            ? Array.from(document.querySelectorAll('#topShoppingItemsTable tbody tr'))
-            : [];
+        try {
+            // Prefer top table rows if present, otherwise look for any table with shopping rows
+            let rows = Array.from(document.querySelectorAll('#topShoppingItemsTable tbody tr'));
+            if (!rows.length) {
+                rows = Array.from(document.querySelectorAll('#bottomShoppingItemsTable tbody tr'));
+            }
 
-        return rows.map(r => ({
-            name: r.querySelector('.item-name')?.value || '',
-            qty: r.querySelector('.item-qty')?.value || '',
-            comments: r.querySelector('.item-comments')?.value || ''
-        })).filter(i => i.name.trim());
+            return rows.map(r => ({
+                name: r.querySelector('.item-name')?.value || '',
+                qty: r.querySelector('.item-qty')?.value || '',
+                comments: r.querySelector('.item-comments')?.value || ''
+            })).filter(i => i.name && i.name.trim());
+        } catch (err) {
+            console.warn('Could not serialize shopping items:', err);
+            return [];
+        }
     }
     // Override hideAddTaskModal to reset form
     hideAddTaskModal() {
@@ -9877,3 +9905,103 @@ document.addEventListener('DOMContentLoaded', () => {
     </div> <!-- Close app-container -->
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
