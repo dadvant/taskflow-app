@@ -848,38 +848,29 @@
     <!-- Add Task Modal - ENHANCED -->
     <div id="addTaskModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2>Add New Task</h2>
+            <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <!-- Inline SVG toggle for Shopping list (click toggles list on/off) -->
+                    <button id="shoppingToggleBtn" type="button" title="Toggle shopping list" style="background:none;border:none;padding:6px;cursor:pointer;font-size:18px;display:flex;align-items:center;gap:8px;">
+                        <svg id="shoppingToggleSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" stroke="none">
+                            <path d="M3 3h2l2.68 11.39a2 2 0 0 0 2 1.61h7.72a2 2 0 0 0 2-1.61L23 6H6z" />
+                            <circle cx="10" cy="20.5" r="1.25" />
+                            <circle cx="19" cy="20.5" r="1.25" />
+                        </svg>
+                    </button>
+                    <h2 id="addTaskModalTitle">Add New Task</h2>
+                </div>
                 <div class="modal-header-actions">
                     <button type="button" class="btn btn--secondary" id="cancelTask">Cancel</button>
                     <button type="submit" class="btn btn--primary" form="taskForm">Add Task</button>
                     <button class="close-btn" id="closeTaskModal">&times;</button>
                 </div>
             </div>
-            <div class="modal-body">
-                <!-- AI Suggestions Panel -->
-                <div id="aiSuggestionsPanel" class="ai-suggestions-panel" style="display: none;">
-                    <div class="ai-suggestion-header">
-                        <i class="fas fa-brain"></i>
-                        <h4>AI Suggestions</h4>
-                        <div class="ai-confidence" id="aiConfidence"></div>
+                    <div class="form-group" style="display:flex; align-items:center; justify-content:flex-end; gap:12px;">
+                        <!-- hidden checkbox preserved for compatibility with existing code
+                             the visible control is the inline svg button in the header -->
+                        <input type="checkbox" id="isShoppingList" style="display:none;">
                     </div>
-                    <div id="aiSuggestionsList" class="ai-suggestions-list"></div>
-                </div>
-
-                <form id="taskForm">
-                    <div class="form-group">
-                        <label for="taskTitle">Title:</label>
-                        <input type="text" id="taskTitle" required placeholder="What needs to be done?">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="taskDescription">Description:</label>
-                        <!-- Dual-mode: freeform textarea (default) and a table-based editor for shopping lists -->
-                        <textarea id="taskDescription" placeholder="Add more details..." style="min-height:80px;"></textarea>
-
-                        <!-- Top shopping editor (hidden by default) - mirrors bottom editor structure -->
-                        <div id="topShoppingEditor" style="display:none; margin-top:12px;">
                             <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
                                 <strong>Items (top)</strong>
                                 <button type="button" class="btn btn--secondary btn--small" id="topAddItemRowBtn">Add row</button>
@@ -1041,29 +1032,10 @@
                     </div>
 
                     <!-- Shopping / Grocery List -->
-                    <div class="form-group">
-                        <label for="isShoppingList" style="display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="isShoppingList">
-                            <img src="assets/icons/shopping-cart.svg" alt="shopping" style="width:20px; height:20px; display:inline-block;">
-                            <span style="font-weight:600;">Shopping / Grocery list</span>
-                        </label>
-                        <div id="shoppingListEditor" style="display:none; margin-top: 12px;">
-                            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-                                <strong>Items</strong>
-                                <button type="button" class="btn btn--secondary btn--small" id="addItemRowBtn">Add row</button>
-                            </div>
-                            <table id="shoppingItemsTable" style="width:100%; border-collapse: collapse;">
-                                <thead>
-                                    <tr>
-                                        <th style="text-align:left; padding:6px; width:50%;">Name</th>
-                                        <th style="text-align:left; padding:6px; width:15%;">Qty</th>
-                                        <th style="text-align:left; padding:6px;">Comments</th>
-                                        <th style="width:40px;"></th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
-                        </div>
+                    <div class="form-group" style="display:flex; align-items:center; justify-content:flex-end; gap:12px;">
+                        <!-- hidden checkbox preserved for compatibility with existing code
+                             the visible control is the inline svg button in the header -->
+                        <input type="checkbox" id="isShoppingList" style="display:none;">
                     </div>
                 </form>
             </div>
@@ -8152,7 +8124,6 @@ Complete this task and stay productive!`;
             // Ensure shopping editor visibility matches checkbox and prevent duplicate displays
             try {
                 const isShoppingEl = document.getElementById('isShoppingList');
-                const editor = document.getElementById('shoppingListEditor');
                 const topEditor = document.getElementById('topShoppingEditor');
                 const descEl = document.getElementById('taskDescription');
                 // Default: hide top editor and show textarea
@@ -8161,9 +8132,8 @@ Complete this task and stay productive!`;
                 if (descEl) descEl.style.display = 'block';
 
                 if (isShoppingEl && isShoppingEl.checked) {
-                    // Show top editor by default for shopping lists and hide the bottom editor to avoid duplication
+                    // Show top editor by default for shopping lists
                     if (topEditor) topEditor.style.display = 'block';
-                    if (editor) editor.style.display = 'none';
                     if (descEl) descEl.style.display = 'none';
                 }
 
@@ -8173,12 +8143,8 @@ Complete this task and stay productive!`;
                     const task = this.tasks.find(t => t.id === this.editingTaskId);
                     if (task && task.isShoppingList && Array.isArray(task.items)) {
                         const topTbody = document.querySelector('#topShoppingItemsTable tbody');
-                        const bottomTbody = document.querySelector('#shoppingItemsTable tbody');
                         if (topTbody && topTbody.children.length === 0) {
                             task.items.forEach(item => this._shoppingAddTopRow(item));
-                        }
-                        if (bottomTbody && bottomTbody.children.length === 0) {
-                            task.items.forEach(item => this._shoppingAddRow(item));
                         }
                     }
                 }
@@ -9198,29 +9164,25 @@ Complete this task and stay productive!`;
         // Set calendar event checkbox
         document.getElementById('createCalendarEvent').checked = !!task.calendarEvent;
 
-        // Populate shopping list editor if this task is a shopping list
+        // Populate shopping list editor (top) if this task is a shopping list
         const isShoppingEl = document.getElementById('isShoppingList');
-        const editorTbody = document.querySelector('#shoppingItemsTable tbody');
         const topEditorTbody = document.querySelector('#topShoppingItemsTable tbody');
-        if (isShoppingEl && editorTbody && topEditorTbody) {
+        if (isShoppingEl && topEditorTbody) {
             // Clear existing rows
-            editorTbody.innerHTML = '';
             topEditorTbody.innerHTML = '';
             if (task.isShoppingList && Array.isArray(task.items)) {
                 isShoppingEl.checked = true;
-                // Populate only the top editor to avoid duplicate tables
+                // Populate only the top editor
                 task.items.forEach(item => {
                     this._shoppingAddTopRow(item);
                 });
-                // Show top editor by default when editing a shopping list and hide bottom editor
+                // Show top editor by default when editing a shopping list
                 const topEditorEl = document.getElementById('topShoppingEditor');
-                const bottomEditorEl = document.getElementById('shoppingListEditor');
                 const descEl2 = document.getElementById('taskDescription');
                 if (topEditorEl && descEl2) {
                     topEditorEl.style.display = 'block';
                     descEl2.style.display = 'none';
                 }
-                if (bottomEditorEl) bottomEditorEl.style.display = 'none';
             } else {
                 isShoppingEl.checked = false;
             }
@@ -9542,30 +9504,16 @@ Complete this task and stay productive!`;
         });
     }
 
-    // Shopping list helper functions
+    // Shopping list helper functions (top-only editor)
     initializeShoppingListEditor() {
         const isShoppingEl = document.getElementById('isShoppingList');
-        const editor = document.getElementById('shoppingListEditor');
         const topEditor = document.getElementById('topShoppingEditor');
         const topAddRowBtn = document.getElementById('topAddItemRowBtn');
         const topToggleBtn = document.getElementById('toggleTopEditorMode');
-        const addRowBtn = document.getElementById('addItemRowBtn');
-        const tbody = document.querySelector('#shoppingItemsTable tbody');
         const topTbody = document.querySelector('#topShoppingItemsTable tbody');
+        const shoppingToggleBtn = document.getElementById('shoppingToggleBtn');
 
         const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-        function addRow(item = { name: '', qty: '', comments: '' }) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="padding:6px;"><input type="text" class="item-name" value="${escapeHtml(item.name)}" style="width:100%"></td>
-                <td style="padding:6px;"><input type="text" class="item-qty" value="${escapeHtml(item.qty)}" style="width:80px"></td>
-                <td style="padding:6px;"><input type="text" class="item-comments" value="${escapeHtml(item.comments)}" style="width:100%"></td>
-                <td style="padding:6px; text-align:center;"><button type="button" class="btn btn--danger btn--small remove-row">✕</button></td>
-            `;
-            tbody.appendChild(tr);
-            tr.querySelector('.remove-row').addEventListener('click', () => tr.remove());
-        }
 
         function addTopRow(item = { name: '', qty: '', comments: '' }) {
             const tr = document.createElement('tr');
@@ -9579,50 +9527,30 @@ Complete this task and stay productive!`;
             tr.querySelector('.remove-row').addEventListener('click', () => tr.remove());
         }
 
-        // expose addRow in instance for use when populating
-        this._shoppingAddRow = addRow.bind(this);
-    this._shoppingAddTopRow = addTopRow.bind(this);
+        // expose addTopRow in instance for use when populating
+        this._shoppingAddTopRow = addTopRow.bind(this);
 
         if (isShoppingEl) {
             isShoppingEl.addEventListener('change', (e) => {
-                if (editor) editor.style.display = isShoppingEl.checked ? 'block' : 'none';
                 if (topEditor) topEditor.style.display = isShoppingEl.checked ? 'block' : 'none';
+                const descEl = document.getElementById('taskDescription');
+                if (descEl) descEl.style.display = isShoppingEl.checked ? 'none' : 'block';
                 // If the editor was just enabled and has no rows, add a starter row
                 try {
-                    const tbodyEl = document.querySelector('#shoppingItemsTable tbody');
-                    if (isShoppingEl.checked && tbodyEl && tbodyEl.children.length === 0) {
-                        this._shoppingAddRow({ name: '', qty: '', comments: '' });
-                        // focus the first input for quick entry
-                        setTimeout(() => {
-                            const first = tbodyEl.querySelector('.item-name');
-                            if (first) try { first.focus(); } catch (_) {}
-                        }, 50);
-                    }
-                    // For top editor too
                     const topTbodyEl = document.querySelector('#topShoppingItemsTable tbody');
                     if (isShoppingEl.checked && topTbodyEl && topTbodyEl.children.length === 0) {
                         this._shoppingAddTopRow({ name: '', qty: '', comments: '' });
+                        setTimeout(() => {
+                            const first = topTbodyEl.querySelector('.item-name');
+                            if (first) try { first.focus(); } catch (_) {}
+                        }, 50);
+                    }
+                    if (!isShoppingEl.checked && topTbodyEl) {
+                        // clear rows when disabling shopping list to avoid stale data
+                        topTbodyEl.innerHTML = '';
                     }
                 } catch (err) {
                     console.warn('Could not auto-add shopping row:', err);
-                }
-            });
-        }
-
-        if (addRowBtn) {
-            // Route bottom 'Add row' to top editor to avoid duplicating tables
-            addRowBtn.addEventListener('click', (e) => {
-                if (this._shoppingAddTopRow) {
-                    this._shoppingAddTopRow({ name: '', qty: '', comments: '' });
-                    // Ensure top editor is visible and bottom hidden
-                    const topEditorEl = document.getElementById('topShoppingEditor');
-                    const bottomEditorEl = document.getElementById('shoppingListEditor');
-                    const descEl = document.getElementById('taskDescription');
-                    if (topEditorEl) topEditorEl.style.display = 'block';
-                    if (bottomEditorEl) bottomEditorEl.style.display = 'none';
-                    if (descEl) descEl.style.display = 'none';
-                } else {
-                    this._shoppingAddRow({ name: '', qty: '', comments: '' });
                 }
             });
         }
@@ -9651,18 +9579,31 @@ Complete this task and stay productive!`;
                 }
             });
         }
+
+        // Header shopping toggle button - toggles the hidden checkbox and editor
+        if (shoppingToggleBtn) {
+            shoppingToggleBtn.addEventListener('click', (e) => {
+                const chk = document.getElementById('isShoppingList');
+                if (!chk) return;
+                chk.checked = !chk.checked;
+                // Trigger change handler to show/hide editor
+                chk.dispatchEvent(new Event('change'));
+                // Visual feedback: toggle a class to change svg color
+                const svg = document.getElementById('shoppingToggleSvg');
+                if (svg) {
+                    svg.style.opacity = chk.checked ? '1' : '0.5';
+                }
+            });
+        }
     }
 
     // When saving a task, serialize shopping list rows into task.items
     _serializeShoppingItems() {
         // Prefer top editor if visible (users working in Add modal top table)
         const topEl = document.getElementById('topShoppingEditor');
-        let rows = [];
-        if (topEl && topEl.style.display && topEl.style.display !== 'none') {
-            rows = Array.from(document.querySelectorAll('#topShoppingItemsTable tbody tr'));
-        } else {
-            rows = Array.from(document.querySelectorAll('#shoppingItemsTable tbody tr'));
-        }
+        const rows = topEl && topEl.style.display && topEl.style.display !== 'none'
+            ? Array.from(document.querySelectorAll('#topShoppingItemsTable tbody tr'))
+            : [];
 
         return rows.map(r => ({
             name: r.querySelector('.item-name')?.value || '',
