@@ -8148,6 +8148,43 @@ Complete this task and stay productive!`;
             
             // Ensure AI preview event listeners are set up
             this.setupAIPreviewListeners();
+
+            // Ensure shopping editor visibility matches checkbox and prevent duplicate displays
+            try {
+                const isShoppingEl = document.getElementById('isShoppingList');
+                const editor = document.getElementById('shoppingListEditor');
+                const topEditor = document.getElementById('topShoppingEditor');
+                const descEl = document.getElementById('taskDescription');
+                // Default: hide top editor and show textarea
+                if (topEditor) topEditor.style.display = 'none';
+                if (editor) editor.style.display = 'none';
+                if (descEl) descEl.style.display = 'block';
+
+                if (isShoppingEl && isShoppingEl.checked) {
+                    // Show top editor by default for shopping lists and hide the bottom editor to avoid duplication
+                    if (topEditor) topEditor.style.display = 'block';
+                    if (editor) editor.style.display = 'none';
+                    if (descEl) descEl.style.display = 'none';
+                }
+
+                // If we're editing an existing task, ensure editors contain rows (they should have been populated in editTask())
+                if (this.editingTaskId) {
+                    // If editors are empty, try to populate from task data
+                    const task = this.tasks.find(t => t.id === this.editingTaskId);
+                    if (task && task.isShoppingList && Array.isArray(task.items)) {
+                        const topTbody = document.querySelector('#topShoppingItemsTable tbody');
+                        const bottomTbody = document.querySelector('#shoppingItemsTable tbody');
+                        if (topTbody && topTbody.children.length === 0) {
+                            task.items.forEach(item => this._shoppingAddTopRow(item));
+                        }
+                        if (bottomTbody && bottomTbody.children.length === 0) {
+                            task.items.forEach(item => this._shoppingAddRow(item));
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('Could not sync shopping editor visibility on modal show:', err);
+            }
         } else {
             console.error('❌ Add Task modal not found!');
         }
