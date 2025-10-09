@@ -77,6 +77,48 @@
 
         // Expose Firebase helper methods as a single manager object
         window.FirebaseManager = {
+            // Initialize Firebase manager: attach auth state listener
+            init() {
+                try {
+                    if (!auth) {
+                        console.warn('Firebase auth not ready yet');
+                        return;
+                    }
+
+                    onAuthStateChanged(auth, async (user) => {
+                        if (user) {
+                            console.log('🔐 Firebase auth state: signed in as', user.email);
+                            // Hide login modal and reveal app container
+                            document.getElementById('loginModal')?.classList.remove('show');
+                            const appContainer = document.getElementById('app-container');
+                            if (appContainer) appContainer.style.display = '';
+
+                            // Call manager onLogin hook if present
+                            try {
+                                if (typeof this.onLogin === 'function') {
+                                    await this.onLogin(user);
+                                }
+                            } catch (e) {
+                                console.error('Error during onLogin handler:', e);
+                            }
+                        } else {
+                            console.log('🔓 Firebase auth state: signed out');
+                            // Show login modal
+                            document.getElementById('loginModal')?.classList.add('show');
+                            // Call logout handler if present
+                            try {
+                                if (typeof this.onLogout === 'function') {
+                                    this.onLogout();
+                                }
+                            } catch (e) {
+                                console.error('Error during onLogout handler:', e);
+                            }
+                        }
+                    });
+                } catch (err) {
+                    console.error('❌ FirebaseManager.init failed:', err);
+                }
+            },
             // Sign in with Google (returns Firebase user)
             async signInWithGoogle() {
                 const provider = new GoogleAuthProvider();
