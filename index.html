@@ -628,6 +628,10 @@
                 <button class="btn btn--tertiary" id="compactToggle" title="Compact view: show more tasks">
                     <i class="fas fa-compress-alt"></i>
                 </button>
+                <!-- Install PWA button (hidden until available) -->
+                <button class="btn btn--tertiary" id="installBtn" title="Install TaskFlow as an app" style="display:none;">
+                    <i class="fas fa-download"></i>
+                </button>
                 <button class="btn btn--primary" id="addTaskBtn">
                     <i class="fas fa-plus"></i>
                     Add Task
@@ -2282,6 +2286,9 @@
         .btn--tertiary:hover {
             background: var(--bg-secondary);
         }
+
+        /* Install button styles (same family) */
+        #installBtn { display: inline-flex; align-items: center; }
 
         /* Compact view: denser list styling */
         body.compact-view .quadrant-tasks .task-item {
@@ -9395,6 +9402,31 @@ window.addEventListener('load', () => {
         }
     }
 })();
+
+// PWA install prompt handling
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent automatic prompt
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const installBtn = document.getElementById('installBtn');
+    if (installBtn) installBtn.style.display = 'inline-flex';
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const installBtn = document.getElementById('installBtn');
+    if (!installBtn) return;
+
+    installBtn.addEventListener('click', async () => {
+        if (!deferredInstallPrompt) return;
+        deferredInstallPrompt.prompt();
+        const { outcome } = await deferredInstallPrompt.userChoice;
+        console.log('PWA install outcome:', outcome);
+        // Hide the button after use
+        installBtn.style.display = 'none';
+        deferredInstallPrompt = null;
+    });
+});
     </script>
 
     <script>
