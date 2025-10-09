@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+# Post-commit hook to update visible version markers by running the PowerShell script.
+# This hook runs after each commit and will create an additional commit if it updates files.
+
+# Use pwsh (PowerShell) if available
+if command -v pwsh >/dev/null 2>&1; then
+  pwsh -NoProfile -ExecutionPolicy Bypass -File "$(git rev-parse --show-toplevel)/scripts/update-version.ps1"
+else
+  # Fall back to plain PowerShell
+  powershell -NoProfile -ExecutionPolicy Bypass -File "$(git rev-parse --show-toplevel)/scripts/update-version.ps1"
+fi
