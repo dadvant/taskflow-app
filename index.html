@@ -7308,6 +7308,21 @@ Calendar event will be created separately.`);
         console.log('✅ renderCurrentView() completed');
     }
 
+    // Backwards-compatibility shim: some code and Firebase listeners call `app.render()`.
+    // Ensure those calls trigger the standard render flow.
+    render() {
+        try {
+            console.log('🔁 render() called - delegating to renderCurrentView');
+            if (typeof this.renderCurrentView === 'function') {
+                this.renderCurrentView();
+            } else {
+                console.warn('⚠️ renderCurrentView is not available');
+            }
+        } catch (err) {
+            console.error('❌ Error in render() shim:', err);
+        }
+    }
+
     // Filter Management Methods
     setupFilterListeners() {
         const priorityFilter = document.getElementById('priorityFilter');
