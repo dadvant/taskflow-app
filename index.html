@@ -12,13 +12,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TaskFlow v3.0 <span class="app-version">(a02d1b1)</span> - Cloud Sync</title>
+    <title>TaskFlow v3.0 <span class="app-version">(8633581)</span> - Cloud Sync</title>
     <link rel="stylesheet" href="taskflow-styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4285f4">
     <!-- Runtime-visible app version (updated by scripts/update-version.ps1) -->
-    <meta name="taskflow-version" content="3.0-a02d1b1">
+    <meta name="taskflow-version" content="3.0-8633581">
     <link rel="icon" href="assets/icons/taskflow-192.svg" sizes="192x192" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/icons/taskflow-192.svg">
     
@@ -426,7 +426,7 @@
             <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
                 <h2 style="margin: 0; display: flex; align-items: center; gap: 10px;">
                     <i class="fas fa-tasks" style="color: var(--primary-color);"></i>
-                    Welcome to TaskFlow v3.0 (a02d1b1)
+                    Welcome to TaskFlow v3.0 (8633581)
                 </h2>
             </div>
             <div class="modal-body" style="padding: 30px 24px;">
@@ -531,7 +531,7 @@
         <div class="logo">
             <i class="fas fa-tasks"></i>
             <span class="app-title">TaskFlow v3.0</span>
-            <span class="app-version">(a02d1b1)</span>
+            <span class="app-version">(8633581)</span>
         </div>
         <div class="header-actions">
             <!-- User Profile -->
@@ -564,7 +564,7 @@
             <div class="logo">
                 <i class="fas fa-tasks"></i>
                 <span class="app-title">TaskFlow v3.0</span>
-                <span class="app-version">(a02d1b1)</span>
+                <span class="app-version">(8633581)</span>
             </div>
             <button class="close-sidebar" id="closeSidebar">
                 <i class="fas fa-times"></i>
@@ -2703,12 +2703,13 @@
             .mobile-header .app-title, .sidebar .app-title { font-size: 15px; font-weight: 600; }
             .mobile-header .app-version, .sidebar .app-version { display: none; }
 
-            /* tighten view title spacing and info area */
-            #currentViewTitle { font-size: 20px; margin: 0 0 6px 0; line-height: 1.1; }
-            .view-info { padding-right: 8px; }
+            /* tighten view title spacing and info area; keep title and controls on one line */
+            #currentViewTitle { font-size: 20px; margin: 0; line-height: 1.1; display: inline-block; vertical-align: middle; }
+            .view-info { padding-right: 8px; display: inline-block; vertical-align: middle; }
+            .content-header { align-items: center; }
 
             /* shrink stat boxes to fit in one row and reduce vertical space */
-            .quick-stats { display:flex; gap:6px; padding: 4px 6px 6px 6px; }
+            .quick-stats { display:flex; gap:6px; padding: 2px 6px 4px 6px; margin-top: 6px; }
             .quick-stats .stat-item { flex: 1 1 0; padding: 6px; margin: 0; min-width: 0; text-align: center; border-radius: 8px; }
             .quick-stats .stat-value { font-size: 16px; line-height: 1; }
             .quick-stats .stat-label { font-size: 10px; }
@@ -2717,9 +2718,9 @@
             .view-actions { gap: 6px; align-items: center; margin-bottom: 6px; display:flex; flex-wrap:nowrap; }
             .view-actions .btn { padding: 6px 8px; font-size: 13px; }
             .view-actions #addTaskBtn { padding: 6px 10px; }
-            /* Put view-mode, compact/resize and add on the same line and reduce their footprint */
+            /* Put view-mode and add on the same line; hide the compact/resize icon on phones to save space */
             .view-actions .btn:first-child { flex: 0 0 auto; }
-            .view-actions .btn:nth-child(2) { flex: 0 0 auto; }
+            .view-actions .btn:nth-child(2) { display: none !important; }
             .view-actions .btn:last-child { margin-left: 6px; flex: 0 0 auto; }
 
             /* ensure main content and task views take most of the viewport and scroll internally */
@@ -2737,7 +2738,8 @@
             .mobile-header .logo i { font-size: 18px; }
 
             /* make task cards more compact and wider so they use horizontal space */
-            .task-item { padding: 8px; margin-bottom: 6px; font-size: 13px; max-width: none; }
+            /* reduce task font-size by 1px to fit more items on screen */
+            .task-item { padding: 8px; margin-bottom: 6px; font-size: 12px; max-width: none; }
             .matrix-quadrant .task-item { padding: 6px 8px; font-size: 12px; }
         }
     </style>
