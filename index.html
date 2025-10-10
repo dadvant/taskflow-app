@@ -12,13 +12,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TaskFlow v3.0 <span class="app-version">(0245e28)</span> - Cloud Sync</title>
+    <title>TaskFlow v3.0 <span class="app-version">(efe99d4)</span> - Cloud Sync</title>
     <link rel="stylesheet" href="taskflow-styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4285f4">
     <!-- Runtime-visible app version (updated by scripts/update-version.ps1) -->
-    <meta name="taskflow-version" content="3.0-0245e28">
+    <meta name="taskflow-version" content="3.0-efe99d4">
     <link rel="icon" href="assets/icons/taskflow-192.svg" sizes="192x192" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/icons/taskflow-192.svg">
     
@@ -426,7 +426,7 @@
             <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
                 <h2 style="margin: 0; display: flex; align-items: center; gap: 10px;">
                     <i class="fas fa-tasks" style="color: var(--primary-color);"></i>
-                    Welcome to TaskFlow v3.0 (0245e28)
+                    Welcome to TaskFlow v3.0 (efe99d4)
                 </h2>
             </div>
             <div class="modal-body" style="padding: 30px 24px;">
@@ -530,7 +530,8 @@
         </button>
         <div class="logo">
             <i class="fas fa-tasks"></i>
-            <span>TaskFlow v3.0 (0245e28)</span>
+            <span class="app-title">TaskFlow v3.0</span>
+            <span class="app-version">(efe99d4)</span>
         </div>
         <div class="header-actions">
             <!-- User Profile -->
@@ -541,10 +542,10 @@
             
             <!-- User Dropdown Menu -->
             <div id="userMenu" class="dropdown-menu" style="display: none; position: absolute; top: 50px; right: 60px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: var(--shadow); min-width: 200px; z-index: 1000;">
-                <div style="padding: 12px; border-bottom: 1px solid var(--border-color);">
-                    <div style="font-weight: 600; color: var(--text-primary); font-size: 14px;" id="userEmailFull">user@email.com</div>
-                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">TaskFlow v3.0</div>
-                </div>
+                    <div style="padding: 12px; border-bottom: 1px solid var(--border-color);">
+                        <div style="font-weight: 600; color: var(--text-primary); font-size: 14px;" id="userEmailFull">user@email.com</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">TaskFlow v3.0 <span id="userMenuVersion" style="font-weight:600; color:var(--text-primary); display:inline-block; margin-left:6px;">(0245e28)</span></div>
+                    </div>
                 <button onclick="handleSignOut()" style="width: 100%; padding: 12px; text-align: left; background: none; border: none; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 14px;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='none'">
                     <i class="fas fa-sign-out-alt"></i>
                     Sign Out
@@ -562,7 +563,8 @@
         <div class="sidebar-header">
             <div class="logo">
                 <i class="fas fa-tasks"></i>
-                <span>TaskFlow v3.0 (0245e28)</span>
+                <span class="app-title">TaskFlow v3.0</span>
+                <span class="app-version">(efe99d4)</span>
             </div>
             <button class="close-sidebar" id="closeSidebar">
                 <i class="fas fa-times"></i>
@@ -676,7 +678,7 @@
         <div class="content-header">
             <div class="view-info">
                 <h1 id="currentViewTitle">Priority Matrix</h1>
-                <p id="currentViewSubtitle">Eisenhower Decision Matrix</p>
+                <p id="currentViewSubtitle" style="display:none;">Eisenhower Decision Matrix</p>
             </div>
             <div class="view-actions">
                 <button class="btn btn--secondary" id="filterBtn">
@@ -2690,6 +2692,34 @@
         #clearFiltersBtn {
             margin-top: 8px;
             width: 100%;
+        }
+
+        /* Mobile-specific adjustments: keep these changes small-scope so laptop/pc behavior is unchanged */
+        @media (max-width: 767px) {
+            /* hide the subtitle globally */
+            #currentViewSubtitle { display: none !important; }
+
+            /* make title smaller and hide version in header */
+            .mobile-header .app-title, .sidebar .app-title { font-size: 16px; font-weight: 600; }
+            .mobile-header .app-version, .sidebar .app-version { display: none; }
+
+            /* shrink stat boxes to fit in one row */
+            .quick-stats { display:flex; gap:8px; padding: 8px; }
+            .quick-stats .stat-item { flex: 1 1 0; padding: 10px; margin: 0; min-width: 0; text-align: center; }
+            .quick-stats .stat-value { font-size: 20px; }
+            .quick-stats .stat-label { font-size: 11px; }
+
+            /* ensure main content and task views take most of the viewport and scroll internally */
+            .main-content { max-height: calc(100vh - 60px); }
+            .task-views { min-height: 70vh; max-height: calc(100vh - 140px); overflow-y: auto; }
+
+            /* reduce top header vertical size */
+            .mobile-header { padding: 8px 12px; }
+            .mobile-header .logo i { font-size: 18px; }
+
+            /* make task cards more compact so more items fit */
+            .task-item { padding: 10px; margin-bottom: 8px; }
+            .matrix-quadrant .task-item { padding: 6px 8px; font-size: 13px; }
         }
     </style>
 
@@ -9838,6 +9868,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         el.textContent = `TaskFlow v3.0 (${txt})`;
                     }
                 });
+                // Also update the user menu version placeholder if present
+                const umv = document.getElementById('userMenuVersion');
+                if (umv) umv.textContent = `(${txt})`;
             } catch (e) {
                 console.warn('Could not load app version:', e);
             }
@@ -9973,111 +10006,3 @@ document.addEventListener('DOMContentLoaded', () => {
     </div> <!-- Close app-container -->
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
