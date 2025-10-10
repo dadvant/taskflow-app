@@ -1,0 +1,41 @@
+name: Auto-update visible version
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Get last commit author
+        id: lastauthor
+        run: |
+          echo "author=$(git log -1 --pretty=format:'%an')" >> $GITHUB_OUTPUT
+
+      - name: Skip if last commit was by GitHub Actions
+        if: contains(steps.lastauthor.outputs.author, 'github-actions')
+        run: |
+          echo "Last commit by GitHub Actions - skipping to avoid loop"
+
+      - name: Setup Node.js
+        if: ${{ !contains(steps.lastauthor.outputs.author, 'github-actions') }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run version updater
+        if: ${{ !contains(steps.lastauthor.outputs.author, 'github-actions') }}
+        run: |
+          node scripts/update-version.js
+
+      - name: Push changes (if any)
+        if: ${{ !contains(steps.lastauthor.outputs.author, 'github-actions') }}
+        run: |
+          git push origin main
