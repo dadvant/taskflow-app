@@ -12,13 +12,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TaskFlow v3.0 <span class="app-version">(8633581)</span> - Cloud Sync</title>
+    <title>TaskFlow v3.0 <span class="app-version">(aebd559)</span> - Cloud Sync</title>
     <link rel="stylesheet" href="taskflow-styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4285f4">
     <!-- Runtime-visible app version (updated by scripts/update-version.ps1) -->
-    <meta name="taskflow-version" content="3.0-8633581">
+    <meta name="taskflow-version" content="3.0-aebd559">
     <link rel="icon" href="assets/icons/taskflow-192.svg" sizes="192x192" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/icons/taskflow-192.svg">
     
@@ -426,7 +426,7 @@
             <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
                 <h2 style="margin: 0; display: flex; align-items: center; gap: 10px;">
                     <i class="fas fa-tasks" style="color: var(--primary-color);"></i>
-                    Welcome to TaskFlow v3.0 (8633581)
+                    Welcome to TaskFlow v3.0 (aebd559)
                 </h2>
             </div>
             <div class="modal-body" style="padding: 30px 24px;">
@@ -531,7 +531,7 @@
         <div class="logo">
             <i class="fas fa-tasks"></i>
             <span class="app-title">TaskFlow v3.0</span>
-            <span class="app-version">(8633581)</span>
+            <span class="app-version">(aebd559)</span>
         </div>
         <div class="header-actions">
             <!-- User Profile -->
@@ -564,7 +564,7 @@
             <div class="logo">
                 <i class="fas fa-tasks"></i>
                 <span class="app-title">TaskFlow v3.0</span>
-                <span class="app-version">(8633581)</span>
+                <span class="app-version">(aebd559)</span>
             </div>
             <button class="close-sidebar" id="closeSidebar">
                 <i class="fas fa-times"></i>
@@ -1054,6 +1054,24 @@
                         <input type="checkbox" id="isShoppingList" style="display:none;">
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reminder Modal (shown 15 minutes before due time) -->
+    <div id="reminderModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="reminderTitle">Reminder</h2>
+                <button class="modal-close" id="closeReminderBtn">×</button>
+            </div>
+            <div class="modal-body">
+                <p id="reminderMessage">Task is due soon</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--secondary" id="reminderOkBtn">OK</button>
+                <button class="btn btn--tertiary" id="reminderSnoozeBtn">Snooze 15m</button>
+                <button class="btn btn--danger" id="reminderDeleteBtn">Delete</button>
             </div>
         </div>
     </div>
@@ -4418,6 +4436,143 @@ class TaskFlowEnhanced {
         setTimeout(checkAndRestore, 100);
     }
 
+    // Reminder system: schedule reminders 15 minutes before due time
+    initializeReminders() {
+        console.log('🔔 Initializing reminder scheduler...');
+        // Clear any existing timers map
+        this._reminderTimers = this._reminderTimers || new Map();
+
+        // Attach modal button handlers
+        try {
+            const okBtn = document.getElementById('reminderOkBtn');
+            const snoozeBtn = document.getElementById('reminderSnoozeBtn');
+            const delBtn = document.getElementById('reminderDeleteBtn');
+            const closeBtn = document.getElementById('closeReminderBtn');
+
+            if (okBtn) okBtn.addEventListener('click', () => this.handleReminderAction('ok'));
+            if (snoozeBtn) snoozeBtn.addEventListener('click', () => this.handleReminderAction('snooze'));
+            if (delBtn) delBtn.addEventListener('click', () => this.handleReminderAction('delete'));
+            if (closeBtn) closeBtn.addEventListener('click', () => this.handleReminderAction('ok'));
+        } catch (err) {
+            console.warn('Could not attach reminder modal handlers:', err);
+        }
+
+        // Schedule reminders for current tasks
+        this.scheduleReminders();
+    }
+
+    scheduleReminders() {
+        console.log('🔁 Scheduling reminders for tasks...');
+        // Clear existing timers
+        if (this._reminderTimers) {
+            for (const t of this._reminderTimers.values()) {
+                clearTimeout(t);
+            }
+        }
+        this._reminderTimers = new Map();
+
+        const now = Date.now();
+        for (const task of this.tasks) {
+            if (!task.dueDate) continue;
+            // build due timestamp
+            const dateTime = task.dueTime ? new Date(task.dueDate + 'T' + task.dueTime + ':00') : new Date(task.dueDate + 'T09:00:00');
+            const remindAt = dateTime.getTime() - (15 * 60 * 1000); // 15 minutes before
+
+            if (remindAt <= now) continue; // too late or in the past
+
+            const delay = remindAt - now;
+            // store timer so we can clear if task changes
+            const timerId = setTimeout(() => this.showReminderModal(task), delay);
+            this._reminderTimers.set(task.id, timerId);
+            console.log(`⏳ Scheduled reminder for ${task.title} at ${new Date(remindAt).toISOString()}`);
+        }
+    }
+
+    // Schedule/Reschedule a single task reminder (call after save/edit)
+    scheduleReminderForTask(task) {
+        if (!task || !task.id) return;
+        // clear existing
+        if (this._reminderTimers && this._reminderTimers.has(task.id)) {
+            clearTimeout(this._reminderTimers.get(task.id));
+            this._reminderTimers.delete(task.id);
+        }
+        if (!task.dueDate) return;
+        const dateTime = task.dueTime ? new Date(task.dueDate + 'T' + task.dueTime + ':00') : new Date(task.dueDate + 'T09:00:00');
+        const remindAt = dateTime.getTime() - (15 * 60 * 1000);
+        const now = Date.now();
+        if (remindAt <= now) return;
+        const delay = remindAt - now;
+        const timerId = setTimeout(() => this.showReminderModal(task), delay);
+        this._reminderTimers.set(task.id, timerId);
+        console.log(`⏳ (single) Scheduled reminder for ${task.title} at ${new Date(remindAt).toISOString()}`);
+    }
+
+    // Show the reminder modal for a task
+    showReminderModal(task) {
+        console.log('🔔 Reminder triggered for task:', task);
+        this._currentReminderTask = task;
+
+        // Show browser notification if permission granted
+        try {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(`Reminder: ${task.title}`, { body: `Due ${task.dueDate}${task.dueTime ? ' at ' + task.dueTime : ''}` });
+            } else if ('Notification' in window && Notification.permission !== 'denied') {
+                Notification.requestPermission().then(p => {
+                    if (p === 'granted') {
+                        new Notification(`Reminder: ${task.title}`, { body: `Due ${task.dueDate}${task.dueTime ? ' at ' + task.dueTime : ''}` });
+                    }
+                });
+            }
+        } catch (err) {
+            console.warn('Could not show browser notification:', err);
+        }
+
+        const modal = document.getElementById('reminderModal');
+        if (!modal) return;
+        document.getElementById('reminderTitle').textContent = task.title || 'Reminder';
+        document.getElementById('reminderMessage').textContent = `Due: ${task.dueDate}${task.dueTime ? ' at ' + task.dueTime : ''}`;
+        modal.style.display = 'block';
+        modal.classList.add('show');
+    }
+
+    // Handle actions from reminder modal: ok (keep), snooze (15m), delete
+    async handleReminderAction(action) {
+        const task = this._currentReminderTask;
+        if (!task) return;
+        const modal = document.getElementById('reminderModal');
+
+        if (action === 'ok') {
+            // mark that reminder was seen for this occurrence
+            task.lastReminderSeenAt = new Date().toISOString();
+            this.saveTasks();
+            this.showNotification('Reminder acknowledged', 'success');
+        } else if (action === 'snooze') {
+            // snooze default 15 minutes
+            const snoozeUntil = Date.now() + (15 * 60 * 1000);
+            task.snoozedUntil = new Date(snoozeUntil).toISOString();
+            this.saveTasks();
+            // schedule a one-off timer
+            setTimeout(() => this.showReminderModal(task), 15 * 60 * 1000);
+            this.showNotification('Snoozed 15 minutes', 'info');
+        } else if (action === 'delete') {
+            // delete the task
+            try {
+                await this.deleteTask(task.id);
+            } catch (err) {
+                console.error('Error deleting task from reminder:', err);
+            }
+        }
+
+        // hide modal
+        if (modal) {
+            modal.classList.remove('show');
+            modal.style.display = 'none';
+        }
+
+        // clear current reminder
+        this._currentReminderTask = null;
+    }
+
     // Initialize with Firebase after authentication
     async initWithFirestore(userId) {
         console.log('🔥 Initializing Firebase for user:', userId);
@@ -4533,6 +4688,8 @@ class TaskFlowEnhanced {
             }
 
             console.log('✅ Firebase initialization complete');
+            // Initialize reminder scheduling now that tasks are loaded
+            try { this.initializeReminders(); } catch (e) { console.warn('Could not initialize reminders:', e); }
         } catch (error) {
             console.error('❌ Firebase initialization error:', error);
             console.error('Error details:', {
@@ -9102,6 +9259,8 @@ Complete this task and stay productive!`;
                 // Don't show error to user - localStorage still works
             }
         }
+        // Re-schedule reminders after tasks change
+        try { this.scheduleReminders(); } catch (e) { console.warn('Could not reschedule reminders:', e); }
     }
 
     async saveProjects() {
