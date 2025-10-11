@@ -12,13 +12,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TaskFlow v3.0 <span class="app-version">(85ceeb5)</span> - Cloud Sync</title>
+    <title>TaskFlow v3.0 <span class="app-version">(e524e54)</span> - Cloud Sync</title>
     <link rel="stylesheet" href="taskflow-styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4285f4">
     <!-- Runtime-visible app version (updated by scripts/update-version.ps1) -->
-    <meta name="taskflow-version" content="3.0-85ceeb5">
+    <meta name="taskflow-version" content="3.0-e524e54">
     <link rel="icon" href="assets/icons/taskflow-192.svg" sizes="192x192" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/icons/taskflow-192.svg">
     
@@ -426,7 +426,7 @@
             <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
                 <h2 style="margin: 0; display: flex; align-items: center; gap: 10px;">
                     <i class="fas fa-tasks" style="color: var(--primary-color);"></i>
-                    Welcome to TaskFlow v3.0 (85ceeb5)
+                    Welcome to TaskFlow v3.0 (e524e54)
                 </h2>
             </div>
             <div class="modal-body" style="padding: 30px 24px;">
@@ -531,7 +531,7 @@
         <div class="logo">
             <i class="fas fa-tasks"></i>
             <span class="app-title">TaskFlow v3.0</span>
-            <span class="app-version">(85ceeb5)</span>
+            <span class="app-version">(e524e54)</span>
         </div>
         <div class="header-actions">
             <!-- User Profile -->
@@ -564,7 +564,7 @@
             <div class="logo">
                 <i class="fas fa-tasks"></i>
                 <span class="app-title">TaskFlow v3.0</span>
-                <span class="app-version">(85ceeb5)</span>
+                <span class="app-version">(e524e54)</span>
             </div>
             <button class="close-sidebar" id="closeSidebar">
                 <i class="fas fa-times"></i>
@@ -7278,7 +7278,7 @@ Calendar event will be created separately.`);
             }
         }
 
-        // Enhanced time parsing - supports 10:30am format
+        // Enhanced time parsing - supports 10:30am format and plain hours like 'at 9'
         const timePatterns = [
             // Pattern 1: "10:30am" or "10:30pm" 
             { pattern: /(?:at\s+)?(\d{1,2}):(\d{2})\s*(am|pm)/i, hoursIdx: 1, minutesIdx: 2, ampmIdx: 3 },
@@ -7286,6 +7286,8 @@ Calendar event will be created separately.`);
             { pattern: /(?:at\s+)?(\d{1,2})\s*(am|pm)/i, hoursIdx: 1, minutesIdx: null, ampmIdx: 2 },
             // Pattern 3: "10:30" (24-hour format)
             { pattern: /(?:at\s+)?(\d{1,2}):(\d{2})(?!\s*[ap]m)/i, hoursIdx: 1, minutesIdx: 2, ampmIdx: null }
+            // Pattern 4: plain hour like "at 9" (assume local 24h where unspecified)
+            ,{ pattern: /(?:at\s+)?(\d{1,2})(?!:)(?:\s*(am|pm))?/i, hoursIdx: 1, minutesIdx: null, ampmIdx: 2 }
         ];
 
         for (const timePattern of timePatterns) {
@@ -7315,6 +7317,27 @@ Calendar event will be created separately.`);
                 break;
             }
         }
+
+        // Additional: parse seconds (e.g., "in 30 seconds")
+        const inSecondsPattern = /in\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s*(seconds?|secs?|sec)\b/i;
+        const inSecondsMatch = lowercaseText.match(inSecondsPattern);
+        if (inSecondsMatch) {
+            const numPart = inSecondsMatch[1].toLowerCase();
+            const amount = wordToNumber[numPart] || parseInt(numPart, 10);
+            if (!isNaN(amount) && amount > 0) {
+                const target = new Date(Date.now() + (amount * 1000));
+                result.suggestedDate = target.toISOString().split('T')[0];
+                const hh = target.getHours().toString().padStart(2, '0');
+                const mm = target.getMinutes().toString().padStart(2, '0');
+                result.suggestedTime = `${hh}:${mm}`;
+                result.confidence += 70;
+                result.suggestedTitle = result.suggestedTitle.replace(inSecondsMatch[0], '').trim();
+                console.log(`🤖 Parsed seconds relative time "${inSecondsMatch[0]}":`, result.suggestedDate, result.suggestedTime);
+            }
+        }
+
+        // Strip polite prefixes like 'remind me to', 'remind me', 'please', etc., from the suggestedTitle
+        result.suggestedTitle = result.suggestedTitle.replace(/^(?:remind me to|remind me|remind|please|pls|could you|can you)\s+/i, '').trim();
 
         // Boost confidence for calendar keywords
         if (result.hasCalendarKeywords) {
