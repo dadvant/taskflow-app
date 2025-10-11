@@ -12,13 +12,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TaskFlow v3.0 <span class="app-version">(e524e54)</span> - Cloud Sync</title>
+    <title>TaskFlow v3.0 <span class="app-version">(beb44e9)</span> - Cloud Sync</title>
     <link rel="stylesheet" href="taskflow-styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4285f4">
     <!-- Runtime-visible app version (updated by scripts/update-version.ps1) -->
-    <meta name="taskflow-version" content="3.0-e524e54">
+    <meta name="taskflow-version" content="3.0-beb44e9">
     <link rel="icon" href="assets/icons/taskflow-192.svg" sizes="192x192" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/icons/taskflow-192.svg">
     
@@ -426,7 +426,7 @@
             <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
                 <h2 style="margin: 0; display: flex; align-items: center; gap: 10px;">
                     <i class="fas fa-tasks" style="color: var(--primary-color);"></i>
-                    Welcome to TaskFlow v3.0 (e524e54)
+                    Welcome to TaskFlow v3.0 (beb44e9)
                 </h2>
             </div>
             <div class="modal-body" style="padding: 30px 24px;">
@@ -531,7 +531,7 @@
         <div class="logo">
             <i class="fas fa-tasks"></i>
             <span class="app-title">TaskFlow v3.0</span>
-            <span class="app-version">(e524e54)</span>
+            <span class="app-version">(beb44e9)</span>
         </div>
         <div class="header-actions">
             <!-- User Profile -->
@@ -564,7 +564,7 @@
             <div class="logo">
                 <i class="fas fa-tasks"></i>
                 <span class="app-title">TaskFlow v3.0</span>
-                <span class="app-version">(e524e54)</span>
+                <span class="app-version">(beb44e9)</span>
             </div>
             <button class="close-sidebar" id="closeSidebar">
                 <i class="fas fa-times"></i>
@@ -7310,6 +7310,56 @@ Calendar event will be created separately.`);
                     }
                 }
 
+                // Check for explicit timezone tokens nearby (e.g., 'PST', 'UTC', 'CET')
+                const tzMatch = lowercaseText.match(/\b(utc|gmt|pst|pdt|est|edt|cet|cest|ist|bst|eet|eest|msk)\b/i);
+                if (tzMatch) {
+                    const tzToken = tzMatch[1].toUpperCase();
+                    // Map common abbreviations to UTC offsets (hours). Note: DST/offsets approximate.
+                    const tzOffsets = {
+                        'UTC': 0, 'GMT': 0,
+                        'PST': -8, 'PDT': -7,
+                        'EST': -5, 'EDT': -4,
+                        'CET': 1, 'CEST': 2,
+                        'IST': 5.5, // India Standard Time
+                        'BST': 1, // British Summer Time (approx)
+                        'EET': 2, 'EEST': 3,
+                        'MSK': 3
+                    };
+                    const tzOffset = tzOffsets[tzToken] !== undefined ? tzOffsets[tzToken] : null;
+
+                    // Determine target date components (use previously parsed suggestedDate if present)
+                    let year, monthIdx, dayOfMonth;
+                    if (result.suggestedDate) {
+                        const parts = result.suggestedDate.split('-').map(p => parseInt(p, 10));
+                        year = parts[0]; monthIdx = parts[1] - 1; dayOfMonth = parts[2];
+                    } else {
+                        const nowLocal = new Date();
+                        year = nowLocal.getFullYear(); monthIdx = nowLocal.getMonth(); dayOfMonth = nowLocal.getDate();
+                        // If time already passed for today, assume next day
+                        const maybe = new Date(year, monthIdx, dayOfMonth, hours, minutes, 0);
+                        if (maybe.getTime() <= Date.now()) {
+                            const nxt = new Date(maybe.getTime() + 24 * 60 * 60 * 1000);
+                            year = nxt.getFullYear(); monthIdx = nxt.getMonth(); dayOfMonth = nxt.getDate();
+                        }
+                    }
+
+                    if (tzOffset !== null) {
+                        // Create a UTC timestamp for the time specified in that timezone
+                        // Since tzOffset is hours east of UTC (positive) we subtract it to get UTC hour
+                        const utcMillis = Date.UTC(year, monthIdx, dayOfMonth, hours - tzOffset, minutes, 0);
+                        const targetLocal = new Date(utcMillis); // this Date is in local timezone representing that instant
+                        result.suggestedDate = targetLocal.toISOString().split('T')[0];
+                        const hh = targetLocal.getHours().toString().padStart(2, '0');
+                        const mm = targetLocal.getMinutes().toString().padStart(2, '0');
+                        result.suggestedTime = `${hh}:${mm}`;
+                        result.confidence += 60;
+                        result.suggestedTitle = result.suggestedTitle.replace(match[0], '').trim();
+                        console.log(`🤖 Parsed time with TZ ${tzToken}: local instant -> ${result.suggestedDate} ${result.suggestedTime}`);
+                        break;
+                    }
+                }
+
+                // No explicit TZ or not recognized: treat as local time
                 result.suggestedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
                 result.confidence += 40;
                 result.suggestedTitle = result.suggestedTitle.replace(match[0], '').trim();
